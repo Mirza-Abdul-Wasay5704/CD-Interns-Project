@@ -44,6 +44,11 @@ let elementIdCounter = 0;
             map.on('click', function(e) {
                 document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
                 document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+                // Save clicked coordinates for SSM import
+                localStorage.setItem('mapLatitude', e.latlng.lat);
+                localStorage.setItem('mapLongitude', e.latlng.lng);
+                sessionStorage.setItem('selectedLatitude', e.latlng.lat);
+                sessionStorage.setItem('selectedLongitude', e.latlng.lng);
             });
         }
 
@@ -57,6 +62,12 @@ let elementIdCounter = 0;
                 alert('Please enter valid coordinates and radius');
                 return;
             }
+
+            // Save searched coordinates for SSM import
+            localStorage.setItem('mapLatitude', lat);
+            localStorage.setItem('mapLongitude', lng);
+            sessionStorage.setItem('selectedLatitude', lat);
+            sessionStorage.setItem('selectedLongitude', lng);
 
             const searchBtn = document.getElementById('searchBtn');
             searchBtn.disabled = true;
