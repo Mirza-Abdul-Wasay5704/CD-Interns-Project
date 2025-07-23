@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis - Smart Trading Area</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/flowbite@1.6.5/dist/flowbite.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#f59e0b',
+                        secondary: '#10b981',
+                        accent: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-gray-900 min-h-screen">
+
+    <!-- Enhanced Navigation -->
+    <nav class="bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-50">
+        <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
+
+            <!-- Logo and Branding -->
+            <a href="index.html" class="flex items-center space-x-4 rtl:space-x-reverse">
+                <img src="/assets/logos/pso.png" alt="PSO Logo" class="w-12 h-12 object-contain" />
+                <div class="flex flex-col">
+                    <span class="text-3xl font-bold whitespace-nowrap">
+                        <span class="text-yellow-400 font-extrabold">Smart</span>
+                        <span class="text-white font-light">Trading Area</span>
+                    </span>
+                    <span class="text-sm text-gray-400 font-normal">Pakistan State Oil - Digital Solutions</span>
+                </div>
+            </a>
+
+            <!-- Hamburger Button -->
+            <button data-collapse-toggle="navbar-default" type="button"
+                class="inline-flex items-center p-2 w-12 h-12 justify-center text-sm text-gray-400 rounded-lg md:hidden hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all duration-300"
+                aria-controls="navbar-default" aria-expanded="false">
+                <span class="sr-only">Open main menu</span>
+                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 17 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M1 1h15M1 7h15M1 13h15" />
+                </svg>
+            </button>
+
+            <!-- Navigation Links -->
+            <div class="hidden w-full md:block md:w-auto" id="navbar-default">
+                <ul
+                    class="font-semibold flex flex-col p-4 md:p-0 mt-4 border border-gray-700 rounded-lg bg-gray-800/90 md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-transparent text-lg">
+
+                    <li>
+                        <a href="index.html"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Home</a>
+                    </li>
+                    <li>
+                        <a href="map.html"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Map</a>
+                    </li>
+                    <li>
+                        <a href="#"
+                            class="block py-3 px-4 text-yellow-400 bg-gray-700 rounded md:bg-transparent md:p-0 transition-all duration-300 hover:text-yellow-300">Analysis</a>
+                    </li>
+                    <li>
+                        <a href="#"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">SSM</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-screen-xl mx-auto px-4 py-6">
+        
+        <!-- Search Parameters Section -->
+        <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6 mb-6">
+            <div class="flex items-center space-x-2 mb-4">
+                <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <h2 class="text-xl font-bold text-white">Analysis Parameters</h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <!-- Latitude -->
+                <div>
+                    <label class="flex items-center space-x-2 text-sm font-medium text-green-400 mb-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Latitude</span>
+                    </label>
+                    <input type="number" id="latitude" step="any" value="24.848376"
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300">
+                </div>
+
+                <!-- Longitude -->
+                <div>
+                    <label class="flex items-center space-x-2 text-sm font-medium text-green-400 mb-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Longitude</span>
+                    </label>
+                    <input type="number" id="longitude" step="any" value="67.113880"
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300">
+                </div>
+
+                <!-- Radius -->
+                <div>
+                    <label class="flex items-center space-x-2 text-sm font-medium text-green-400 mb-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>Radius (km)</span>
+                    </label>
+                    <input type="number" id="radius" value="2" min="0.5" max="10" step="0.5"
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300">
+                </div>
+
+                <!-- Analyze Button -->
+                <div class="flex items-end">
+                    <button id="analyzeBtn" onclick="startAnalysis(); analyzeTrafficArea(); analyzePopulationArea()"
+                        class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z"></path>
+                        </svg>
+                        <span>Analyze Area</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Results Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left Column - Maps -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Land Use Analysis Map -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 overflow-hidden">
+                    <div class="p-4 border-b border-gray-700/50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <svg class="w-6 h-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12z" clip-rule="evenodd"></path>
+                                </svg>
+                                <h3 class="text-lg font-bold text-white">Land Use Analysis</h3>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="toggleLandUse" onclick="toggleLandUseLayer()" class="text-green-400 hover:text-green-300 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                                <button class="text-gray-400 hover:text-white transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="analysisMap" class="h-96 w-full"></div>
+                </div>
+
+                <!-- Traffic Congestion Map -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 overflow-hidden">
+                    <div class="p-4 border-b border-gray-700/50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                                <h3 class="text-lg font-bold text-white">Traffic Congestion Analysis</h3>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="toggleTraffic" onclick="toggleTrafficLayer()" class="text-red-400 hover:text-red-300 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                                <button id="refreshTraffic" onclick="refreshTrafficData()" class="text-yellow-400 hover:text-yellow-300 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Traffic Legend -->
+                        <div class="flex items-center space-x-6 mt-3 text-sm">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-4 h-1 bg-red-500 rounded"></div>
+                                <span class="text-red-400">Heavy Traffic</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-4 h-1 bg-yellow-500 rounded"></div>
+                                <span class="text-yellow-400">Moderate</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-4 h-1 bg-green-500 rounded"></div>
+                                <span class="text-green-400">Free Flow</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="trafficMap" class="h-96 w-full"></div>
+                </div>
+
+                <!-- Population Density Map -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 overflow-hidden">
+                    <div class="p-4 border-b border-gray-700/50">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                                <h3 class="text-lg font-bold text-white">Population Density</h3>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="togglePopulation" onclick="togglePopulationLayer()" class="text-blue-400 hover:text-blue-300 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                                <button onclick="refreshPopulationData()" class="text-green-400 hover:text-green-300 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Population Legend -->
+                        <div class="flex items-center space-x-4 mt-3 text-sm">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-red-500 rounded-full opacity-80"></div>
+                                <span class="text-red-400">High Density</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-yellow-500 rounded-full opacity-60"></div>
+                                <span class="text-yellow-400">Medium</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full opacity-40"></div>
+                                <span class="text-blue-400">Low</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="populationMap" class="h-96 w-full"></div>
+                </div>
+
+                <!-- Site Classification -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <!-- Site Type -->
+                    <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold text-white">Site Type</h4>
+                        </div>
+                        <div id="siteType" class="text-2xl font-bold text-yellow-400">
+                            <div class="animate-pulse bg-gray-600 h-8 rounded-lg w-24"></div>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-2">Based on surrounding infrastructure</p>
+                    </div>
+
+                    <!-- Area Status -->
+                    <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                        <div class="flex items-center space-x-3 mb-4">
+                            <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0v-5a1 1 0 011-1h4a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold text-white">Dominant Land Use</h4>
+                        </div>
+                        <div id="areaStatus" class="text-2xl font-bold text-green-400">
+                            <div class="animate-pulse bg-gray-600 h-8 rounded-lg w-32"></div>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-2">Primary zoning classification</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Statistics and Charts -->
+            <div class="space-y-6">
+                
+                <!-- Land Use Distribution -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                    <div class="flex items-center space-x-2 mb-6">
+                        <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                        </svg>
+                        <h4 class="text-lg font-semibold text-white">Land Use Distribution</h4>
+                    </div>
+                    <div class="relative h-64">
+                        <canvas id="landUseChart"></canvas>
+                    </div>
+                    <div class="mt-4 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                                <span class="text-sm text-gray-300">Residential</span>
+                            </div>
+                            <span id="residentialCount" class="text-sm font-semibold text-white">-</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-blue-400 rounded-full"></div>
+                                <span class="text-sm text-gray-300">Commercial</span>
+                            </div>
+                            <span id="commercialCount" class="text-sm font-semibold text-white">-</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 bg-purple-400 rounded-full"></div>
+                                <span class="text-sm text-gray-300">Industrial</span>
+                            </div>
+                            <span id="industrialCount" class="text-sm font-semibold text-white">-</span>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Amenities Analysis -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                    <div class="flex items-center space-x-2 mb-6">
+                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0v-5a1 1 0 011-1h4a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <h4 class="text-lg font-semibold text-white">Key Amenities</h4>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-white font-medium">Universities</span>
+                            </div>
+                            <span id="universityCount" class="text-xl font-bold text-blue-400">-</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M8 11v6h8v-6M8 11H6a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2v-6a2 2 0 00-2-2h-2"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-white font-medium">Schools</span>
+                            </div>
+                            <span id="schoolCount" class="text-xl font-bold text-green-400">-</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-white font-medium">Malls</span>
+                            </div>
+                            <span id="mallCount" class="text-xl font-bold text-purple-400">-</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-white font-medium">Fuel Stations</span>
+                            </div>
+                            <span id="fuelStationCount" class="text-xl font-bold text-yellow-400">-</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5-5M7 13l-2.5 5M17 17a2 2 0 11-4 0 2 2 0 014 0zM9 17a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                    </svg>
+                                </div>
+                                <span class="text-white font-medium">Restaurants</span>
+                            </div>
+                            <span id="restaurantCount" class="text-xl font-bold text-red-400">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8">
+                    <div class="flex flex-col items-center justify-center space-y-4">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+                        <p class="text-white font-medium">Analyzing area data...</p>
+                        <p class="text-sm text-gray-400 text-center">Fetching land use information and amenities from OpenStreetMap</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 border-t border-gray-700 mt-20">
+        <div class="max-w-screen-xl mx-auto px-6 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+
+                <!-- Left Side - Company Info -->
+                <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                    <img src="/assets/logos/pso.png" alt="PSO Logo" class="w-12 h-12 object-contain" />
+                    <div>
+                        <div class="text-xl font-bold text-white">Pakistan State Oil</div>
+                        <div class="text-sm text-gray-400">Channel Development Department</div>
+                    </div>
+                </div>
+
+                <!-- Right Side - Contact Info -->
+                <div class="flex items-center space-x-4 text-sm text-gray-400">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                        </svg>
+                        <span class="text-green-400">support@pso.com.pk</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom -->
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center">
+                <p class="text-sm text-gray-500">
+                    © 2025 Pakistan State Oil Company Limited • Powered by Interns • Secure & ISO Compliant
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="analysis.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Find nearest PSO and competitor fuel stations with competitive analysis and trading area insights">
+    <meta name="keywords" content="PSO, fuel stations, Pakistan, petroleum, competitive analysis">
+    <meta name="author" content="PSO Fuel Station Finder">
+    
+    <title>PSO Fuel Station Finder - Competitive Market Analysis</title>
+    
+    <!-- Preconnect to external domains for performance -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pso: {
+                            primary: '#003366',
+                            secondary: '#FFD700',
+                            green: '#006400',
+                            light: '#f7fafd'
+                        },
+                        competitor: {
+                            red: '#dc2626',
+                            dark: '#991b1b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- External CSS Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    
+    <!-- Custom CSS (minimal - only what Tailwind cannot handle) -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-pso-light to-gray-50 font-sans antialiased">
+    <!-- Loading Screen -->
+    <div id="app-loading" class="fixed inset-0 bg-gradient-to-br from-pso-light to-gray-50 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="mb-8">
+                <img src="assets/logos/pso.png" alt="PSO Logo" class="h-16 w-auto mx-auto opacity-90">
+            </div>
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pso-primary mx-auto mb-4"></div>
+            <h2 class="text-xl font-semibold text-pso-primary mb-2">Loading PSO Fuel Station Finder</h2>
+            <p class="text-gray-600">Initializing map and libraries...</p>
+        </div>
+    </div>
+
+    <!-- Main Application Content -->
+    <div id="app-content" class="hidden">
+
+    <!-- Skip Navigation Link -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-pso-primary text-pso-secondary px-4 py-2 rounded-lg z-50 transition-all duration-200">
+        Skip to main content
+    </a>
+
+    <div class="container mx-auto px-4 py-5 max-w-7xl">
+        <!-- Header Section -->
+        <header class="bg-gradient-to-r from-pso-primary to-blue-900 text-pso-secondary rounded-2xl shadow-2xl mb-6 overflow-hidden">
+            <div class="px-8 py-8 text-center relative">
+                <!-- PSO Logo -->
+                <div class="flex justify-center items-center mb-4">
+                    <img src="assets/logos/pso.png" 
+                         alt="PSO - Pakistan State Oil Logo" 
+                         class="h-20 w-auto object-contain"
+                         loading="eager">
+                </div>
+                
+                <!-- Main Title -->
+                <h1 class="text-4xl md:text-5xl font-black mb-3 tracking-wide drop-shadow-lg">
+                    PSO Fuel Station Finder
+                </h1>
+                
+                <!-- Subtitle -->
+                <p class="text-lg md:text-xl font-medium opacity-90 max-w-2xl mx-auto">
+                    Find the nearest PSO and competitor fuel stations with competitive analysis and market insights.
+                </p>
+                
+                <!-- Decorative Elements -->
+                <div class="absolute top-4 right-4 opacity-20">
+                    <i class="fas fa-gas-pump text-4xl"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Controls Section -->
+        <section class="bg-white rounded-2xl shadow-xl mb-6 overflow-hidden" aria-labelledby="search-heading">
+            <div class="px-8 py-8">
+                <h2 id="search-heading" class="sr-only">Search Controls</h2>
+                
+                <!-- Search Form -->
+                <form class="flex flex-wrap gap-6 items-end justify-center" onsubmit="event.preventDefault(); searchStations();">
+                    <!-- Coordinate Inputs -->
+                    <div class="flex-1 min-w-48">
+                        <label for="latitude" class="block text-sm font-bold text-pso-primary mb-2">
+                            <i class="fas fa-map-marker-alt mr-1"></i>
+                            Latitude
+                        </label>
+                        <input type="text" 
+                               id="latitude" 
+                               placeholder="e.g., 25.3730"
+                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base font-medium transition-all duration-200 focus:border-pso-primary focus:ring-2 focus:ring-pso-primary focus:ring-opacity-20 focus:outline-none hover:border-gray-300"
+                               aria-describedby="latitude-help">
+                        <div id="latitude-help" class="sr-only">Enter the latitude coordinate for search center</div>
+                    </div>
+
+                    <div class="flex-1 min-w-48">
+                        <label for="longitude" class="block text-sm font-bold text-pso-primary mb-2">
+                            <i class="fas fa-map-marker-alt mr-1"></i>
+                            Longitude
+                        </label>
+                        <input type="text" 
+                               id="longitude" 
+                               placeholder="e.g., 68.3512"
+                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base font-medium transition-all duration-200 focus:border-pso-primary focus:ring-2 focus:ring-pso-primary focus:ring-opacity-20 focus:outline-none hover:border-gray-300"
+                               aria-describedby="longitude-help">
+                        <div id="longitude-help" class="sr-only">Enter the longitude coordinate for search center</div>
+                    </div>
+
+                    <div class="flex-1 min-w-40">
+                        <label for="radius" class="block text-sm font-bold text-pso-primary mb-2">
+                            <i class="fas fa-circle-notch mr-1"></i>
+                            Radius (km)
+                        </label>
+                        <input type="number" 
+                               id="radius" 
+                               placeholder="e.g., 10" 
+                               min="1" 
+                               max="50"
+                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg text-base font-medium transition-all duration-200 focus:border-pso-primary focus:ring-2 focus:ring-pso-primary focus:ring-opacity-20 focus:outline-none hover:border-gray-300"
+                               aria-describedby="radius-help">
+                        <div id="radius-help" class="sr-only">Enter search radius in kilometers (1-50)</div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3">
+                        <button id="searchBtn" 
+                                type="submit"
+                                class="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-pso-secondary to-yellow-400 text-pso-primary rounded-lg font-bold text-lg transition-all duration-200 hover:shadow-lg hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-pso-secondary focus:ring-opacity-50 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0"
+                                aria-describedby="search-button-help">
+                            <i class="fas fa-search"></i>
+                            <span>Search</span>
+                        </button>
+                        
+                        <button id="focusModeBtn" 
+                                type="button"
+                                onclick="toggleFocusMode()"
+                                class="flex items-center gap-2 px-6 py-3 bg-emerald-700 text-white rounded-lg font-bold transition-all duration-200 hover:bg-emerald-800 hover:shadow-lg hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-50"
+                                aria-label="Toggle focus mode for cleaner map view">
+                            <i class="fas fa-crosshairs"></i>
+                            <span class="hidden sm:inline">Focus Mode</span>
+                        </button>
+                        
+                        <button id="tradingAreaBtn" 
+                                type="button"
+                                onclick="generateTradingArea()"
+                                class="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-bold transition-all duration-200 hover:bg-purple-700 hover:shadow-lg hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+                                aria-label="Generate trading area analysis">
+                            <i class="fas fa-chart-line"></i>
+                            <span class="hidden sm:inline">Trading Area</span>
+                        </button>
+                    </div>
+                </form>
+                
+                <div id="search-button-help" class="sr-only">Click to search for fuel stations in the specified area</div>
+            </div>
+        </section>
+
+        <!-- Map Controls -->
+        <section class="mb-6" aria-labelledby="map-controls-heading">
+            <h2 id="map-controls-heading" class="sr-only">Map Controls</h2>
+            <div class="flex flex-wrap justify-end gap-3">
+                <button id="editMapBtn" 
+                        onclick="toggleEditMode()"
+                        class="flex items-center gap-2 px-6 py-3 bg-pso-primary text-pso-secondary rounded-lg font-bold transition-all duration-200 hover:bg-blue-800 hover:shadow-lg hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-pso-primary focus:ring-opacity-50"
+                        aria-label="Toggle map edit mode to add custom markers">
+                    <i class="fas fa-edit"></i>
+                    <span>Edit Map</span>
+                </button>
+                
+                <button id="exportExcelBtn" 
+                        onclick="exportStationsToExcel()"
+                        class="flex items-center gap-2 px-6 py-3 bg-pso-secondary text-pso-primary rounded-lg font-bold transition-all duration-200 hover:bg-yellow-500 hover:shadow-lg hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-pso-secondary focus:ring-opacity-50"
+                        aria-label="Export station data to Excel spreadsheet">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Export Excel</span>
+                </button>
+                
+                <button id="exportMapBtn" 
+                        onclick="exportMapAsImage()"
+                        class="flex items-center gap-2 px-6 py-3 bg-green-500 text-pso-primary rounded-lg font-bold transition-all duration-200 hover:bg-green-600 hover:shadow-lg hover:scale-105 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+                        aria-label="Export map as PNG image">
+                    <i class="fas fa-image"></i>
+                    <span>Export Map</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Edit Toolbox (Hidden by default) -->
+        <aside id="edit-toolbox" 
+               class="hidden fixed top-20 right-10 z-40 bg-white border-2 border-pso-primary rounded-xl shadow-2xl p-6 min-w-48"
+               role="dialog"
+               aria-labelledby="edit-toolbox-title"
+               aria-hidden="true">
+            <h3 id="edit-toolbox-title" class="font-bold text-pso-primary mb-4 text-center">
+                <i class="fas fa-tools mr-2"></i>
+                Edit Tools
+            </h3>
+            
+            <div class="space-y-3">
+                <button id="addTextBtn" 
+                        onclick="setAddType('text')"
+                        class="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
+                    <i class="fas fa-font"></i>
+                    <span>Add Text</span>
+                </button>
+                
+                <button id="addImageBtn" 
+                        onclick="setAddType('image')"
+                        class="w-full flex items-center justify-center gap-2 bg-pso-secondary hover:bg-yellow-500 text-pso-primary px-4 py-3 rounded-lg font-semibold transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-pso-secondary focus:ring-opacity-50">
+                    <i class="fas fa-image"></i>
+                    <span>Add Image</span>
+                </button>
+                
+                <button id="exitEditBtn" 
+                        onclick="disableEditMode()"
+                        class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 mt-4">
+                    <i class="fas fa-times"></i>
+                    <span>Exit Edit Mode</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main id="main-content" class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <!-- Map Container -->
+            <section class="xl:col-span-3 bg-white rounded-2xl shadow-xl overflow-hidden" aria-labelledby="map-heading">
+                <h2 id="map-heading" class="sr-only">Interactive Map</h2>
+                <div class="relative">
+                    <div id="map" 
+                         class="w-full h-96 md:h-[600px] rounded-2xl"
+                         role="application"
+                         aria-label="Interactive map showing fuel stations">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sidebar -->
+            <aside class="xl:col-span-1 space-y-6">
+                <!-- Statistics Cards -->
+                <section class="bg-white rounded-2xl shadow-xl p-6" aria-labelledby="stats-heading">
+                    <h2 id="stats-heading" class="text-xl font-bold text-pso-primary mb-6 flex items-center gap-2">
+                        <i class="fas fa-chart-bar"></i>
+                        Station Statistics
+                    </h2>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- PSO Stations Card -->
+                        <div class="stat-card bg-gradient-to-br from-green-50 to-emerald-100 p-4 rounded-xl border-2 border-green-200 text-center hover:shadow-lg transition-all duration-200 cursor-pointer group">
+                            <div id="pso-count" class="text-3xl font-black text-pso-green mb-1 group-hover:scale-110 transition-transform duration-200">0</div>
+                            <div class="text-sm font-bold text-pso-primary">PSO Stations</div>
+                        </div>
+                        
+                        <!-- Competitor Stations Card -->
+                        <div class="stat-card bg-gradient-to-br from-red-50 to-rose-100 p-4 rounded-xl border-2 border-red-200 text-center hover:shadow-lg transition-all duration-200 cursor-pointer group">
+                            <div id="competitor-count" class="text-3xl font-black text-competitor-red mb-1 group-hover:scale-110 transition-transform duration-200">0</div>
+                            <div class="text-sm font-bold text-pso-primary">Competitors</div>
+                        </div>
+                        
+                        <!-- Total Stations Card -->
+                        <div class="stat-card bg-gradient-to-br from-blue-50 to-sky-100 p-4 rounded-xl border-2 border-blue-200 text-center hover:shadow-lg transition-all duration-200 cursor-pointer group">
+                            <div id="total-count" class="text-3xl font-black text-pso-primary mb-1 group-hover:scale-110 transition-transform duration-200">0</div>
+                            <div class="text-sm font-bold text-pso-primary">Total Stations</div>
+                        </div>
+                        
+                        <!-- Coverage Percentage Card -->
+                        <div class="stat-card bg-gradient-to-br from-yellow-50 to-amber-100 p-4 rounded-xl border-2 border-yellow-200 text-center hover:shadow-lg transition-all duration-200 cursor-pointer group">
+                            <div id="coverage-percent" class="text-3xl font-black text-pso-secondary mb-1 group-hover:scale-110 transition-transform duration-200 coverage-text-shadow">-</div>
+                            <div class="text-sm font-bold text-pso-primary">PSO Coverage</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Results Container -->
+                <section class="bg-white rounded-2xl shadow-xl max-h-[480px] overflow-hidden flex flex-col" aria-labelledby="results-heading">
+                    <!-- Results Header -->
+                    <header class="p-5 pb-4 border-b border-gray-100 flex-shrink-0">
+                        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                            <h2 id="results-heading" class="text-lg font-bold text-pso-primary flex items-center gap-2">
+                                <i class="fas fa-list"></i>
+                                Station Results
+                            </h2>
+                            
+                            <!-- Filter Buttons -->
+                            <div class="flex gap-2" role="tablist" aria-label="Filter station results">
+                                <button class="filter-btn filter-btn-active px-3 py-1.5 text-xs font-semibold rounded-lg border-2 transition-all duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-pso-secondary focus:ring-opacity-50" 
+                                        onclick="filterResults('all')"
+                                        role="tab"
+                                        aria-selected="true"
+                                        aria-controls="results-list">
+                                    All
+                                </button>
+                                <button class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2 border-gray-200 bg-gray-50 text-pso-primary transition-all duration-200 hover:shadow-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50" 
+                                        onclick="filterResults('pso')"
+                                        role="tab"
+                                        aria-selected="false"
+                                        aria-controls="results-list">
+                                    PSO
+                                </button>
+                                <button class="filter-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2 border-gray-200 bg-gray-50 text-pso-primary transition-all duration-200 hover:shadow-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50" 
+                                        onclick="filterResults('competitor')"
+                                        role="tab"
+                                        aria-selected="false"
+                                        aria-controls="results-list">
+                                    Competitors
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <!-- Results List -->
+                    <div id="results-list" 
+                         class="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar"
+                         role="tabpanel"
+                         aria-live="polite"
+                         aria-label="Filtered station results">
+                        <!-- Results will be populated by JavaScript -->
+                    </div>
+                </section>
+            </aside>
+        </main>
+
+        <!-- Location Analysis Section (Below Map) -->
+        <section class="mt-8 bg-white rounded-2xl shadow-xl overflow-hidden" aria-labelledby="location-analysis-heading">
+            <!-- Site Status Bar -->
+            <div id="site-status-below" 
+                 class="bg-gradient-to-r from-pso-light to-gray-100 px-8 py-4 border-b border-gray-200">
+                <div class="text-lg font-semibold text-pso-primary text-center" 
+                     aria-live="polite">
+                    <!-- Location status will be populated by JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Site Analysis Grid -->
+            <div id="site-analysis-container" class="hidden p-8">
+                <h2 id="site-analysis-heading" class="text-xl font-bold text-pso-primary mb-6 flex items-center gap-2">
+                    <i class="fas fa-chart-bar"></i>
+                    Site Analysis
+                </h2>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Analysis Items -->
+                    <div class="analysis-item flex items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
+                        <div class="analysis-icon flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-hospital text-red-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-pso-primary">Hospitals</div>
+                            <div id="count-hospitals" class="text-2xl font-black text-pso-green">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-item flex items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
+                        <div class="analysis-icon flex-shrink-0 w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-utensils text-orange-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-pso-primary">Restaurants</div>
+                            <div id="count-restaurants" class="text-2xl font-black text-pso-green">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-item flex items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
+                        <div class="analysis-icon flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-graduation-cap text-blue-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-pso-primary">Educational</div>
+                            <div id="count-educational" class="text-2xl font-black text-pso-green">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-item flex items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
+                        <div class="analysis-icon flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-shopping-cart text-purple-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-pso-primary">Malls</div>
+                            <div id="count-malls" class="text-2xl font-black text-pso-green">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-item flex items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
+                        <div class="analysis-icon flex-shrink-0 w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-clinic-medical text-green-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-pso-primary">Clinics</div>
+                            <div id="count-clinics" class="text-2xl font-black text-pso-green">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-item flex items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors duration-200">
+                        <div class="analysis-icon flex-shrink-0 w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-university text-yellow-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-bold text-pso-primary">Banks</div>
+                            <div id="count-banks" class="text-2xl font-black text-pso-green">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detailed Location Analysis Section -->
+        <section id="location-analysis-section" class="hidden mt-6 bg-white rounded-2xl shadow-xl p-8">
+            <!-- Content will be populated by JavaScript -->
+        </section>
+    </div>
+    
+    </div> <!-- End of app-content -->
+
+    <!-- External JavaScript Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dom-to-image@2.6.0/dist/dom-to-image.min.js" crossorigin="anonymous"></script>
+    
+    <!-- Main Application Script -->
+    <script src="script.js"></script>
+</body>
+</html>

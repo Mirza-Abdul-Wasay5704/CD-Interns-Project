@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Trading Area</title>
+    <link rel="icon" type="image/png" href="/assets/logos/pso.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/flowbite@1.6.5/dist/flowbite.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#f59e0b',
+                        secondary: '#10b981',
+                        accent: '#3b82f6'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-gray-900 min-h-screen">
+
+    <!-- Enhanced Navigation -->
+    <nav class="bg-gray-900/95 backdrop-blur-sm border-b border-gray-700/50 sticky top-0 z-50">
+        <div class="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
+
+            <!-- Logo and Branding -->
+            <a href="#" class="flex items-center space-x-4 rtl:space-x-reverse">
+                <img src="/assets/logos/pso.png" alt="PSO Logo" class="w-12 h-12 object-contain" />
+                <div class="flex flex-col">
+                    <span class="text-3xl font-bold whitespace-nowrap">
+                        <span class="text-yellow-400 font-extrabold">Smart</span>
+                        <span class="text-white font-light">Trading Area</span>
+                    </span>
+                    <span class="text-sm text-gray-400 font-normal">Pakistan State Oil - Digital Solutions</span>
+                </div>
+            </a>
+
+            <!-- Hamburger Button -->
+            <button data-collapse-toggle="navbar-default" type="button"
+                class="inline-flex items-center p-2 w-12 h-12 justify-center text-sm text-gray-400 rounded-lg md:hidden hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all duration-300"
+                aria-controls="navbar-default" aria-expanded="false">
+                <span class="sr-only">Open main menu</span>
+                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 17 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M1 1h15M1 7h15M1 13h15" />
+                </svg>
+            </button>
+
+            <!-- Navigation Links -->
+            <div class="hidden w-full md:block md:w-auto" id="navbar-default">
+                <ul
+                    class="font-semibold flex flex-col p-4 md:p-0 mt-4 border border-gray-700 rounded-lg bg-gray-800/90 md:flex-row md:space-x-8 rtl:space-x-reverse md:mt-0 md:border-0 md:bg-transparent text-lg">
+
+                    <li>
+                        <a href="Test.html"
+                            class="block py-3 px-4 text-yellow-400 bg-gray-700 rounded md:bg-transparent md:p-0 transition-all duration-300 hover:text-yellow-300">Home</a>
+                    </li>
+                    <li>
+                        <a href="map.html"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Map</a>
+                    </li>
+                    <li>
+                        <a href="analysis.html"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Analysis</a>
+                    </li>
+                    <li>
+                        <a href="#"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">SSM</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-12">
+
+        <!-- Hero Section -->
+        <section class="text-center mb-16">
+            <h1 class="text-center text-4xl md:text-6xl font-extrabold mb-6 text-yellow-400 leading-tight">
+                <span class="block">Welcome to</span>
+                <span class="block text-yellow-500">Smart Trading Analytics Platform</span>
+            </h1>
+            <p class="text-2xl md:text-3xl text-gray-300 mb-8 font-light max-w-4xl mx-auto leading-relaxed">
+                Your intelligent platform for advanced market analysis, real-time trading insights, and strategic
+                portfolio management
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <!-- Start Analysis Button -->
+                <button onclick="goToMap()"
+                    class="bg-green-800 hover:bg-green-700 text-white px-8 py-4 text-xl font-bold rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105">
+                    Start Analysis
+                </button>
+
+                <!-- Learn More Button -->
+                <button
+                    class="border-2 border-green-700 text-green-700 px-8 py-4 text-xl font-bold rounded-lg hover:bg-greem-500 hover:text-white transition-all duration-300">
+                    Learn More
+                </button>
+            </div>
+
+        </section>
+        <script>
+            function goToMap() {
+                window.location.href = 'map.html';
+            }
+        </script>
+
+
+        <!-- Features Grid -->
+        <section class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+
+            <!-- Market Analysis Card -->
+            <div
+                class="bg-gray-800 p-8 rounded-2xl border border-gray-700 hover:border-yellow-400/50 transition-all duration-300 hover:transform hover:scale-105">
+                <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mb-6">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-4">Market Analysis</h3>
+                <p class="text-lg text-gray-300 leading-relaxed">
+                    Advanced technical analysis tools with real-time market data and AI-powered insights to help you
+                    make informed trading decisions.
+                </p>
+            </div>
+
+            <!-- Dynamic Trading Area Card -->
+            <div
+                class="bg-gray-800 p-8 rounded-2xl border border-gray-700 hover:border-yellow-400/50 transition-all duration-300 hover:transform hover:scale-105">
+                <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mb-6">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-4">Dynamic Trading Area</h3>
+                <p class="text-lg text-gray-300 leading-relaxed">
+                    Real-time dynamic trading environment with adaptive algorithms that respond to market changes and
+                    execute optimal trades automatically.
+                </p>
+            </div>
+
+            <!-- Site Selection Metrics Card -->
+            <div
+                class="bg-gray-800 p-8 rounded-2xl border border-gray-700 hover:border-yellow-400/50 transition-all duration-300 hover:transform hover:scale-105">
+                <div class="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center mb-6">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-4">Site Selection Metrics</h3>
+                <p class="text-lg text-gray-300 leading-relaxed">
+                    Comprehensive location analytics and site evaluation tools to identify optimal trading locations and
+                    strategic positioning opportunities.
+                </p>
+            </div>
+
+        </section>
+
+        <!-- Stats Section -->
+        <section class="bg-gray-800 backdrop-blur-sm rounded-3xl p-12 border border-gray-700" id="stats-section">
+            <h2 class="text-4xl font-bold text-center text-white mb-12">Platform Statistics</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+                <div class="space-y-2">
+                    <div class="text-5xl font-black text-yellow-400" id="counter-requests">0</div>
+                    <div class="text-xl text-gray-300 font-medium">Total Requests</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="text-5xl font-black text-green-400" id="counter-acceptance">0%</div>
+                    <div class="text-xl text-gray-300 font-medium">Acceptance Rate</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="text-5xl font-black text-blue-400" id="counter-trades">0</div>
+                    <div class="text-xl text-gray-300 font-medium">Active Trades</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="text-5xl font-black text-purple-400">24/7</div>
+                    <div class="text-xl text-gray-300 font-medium">Pumps Coverage</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Counter Animation Function
+        function animateCounter(element, targetValue, duration = 2000, isPercentage = false) {
+            const startValue = 0;
+            const increment = targetValue / (duration / 16); // 60 FPS
+            let currentValue = startValue;
+
+            const timer = setInterval(() => {
+                currentValue += increment;
+                if (currentValue >= targetValue) {
+                    currentValue = targetValue;
+                    clearInterval(timer);
+                }
+
+                if (isPercentage) {
+                    element.textContent = Math.floor(currentValue) + '%';
+                } else {
+                    element.textContent = Math.floor(currentValue).toLocaleString();
+                }
+            }, 16);
+        }
+
+        // Intersection Observer for scroll-triggered animation
+        const observerOptions = {
+            threshold: 0.5,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Animate counters when section comes into view
+                    animateCounter(document.getElementById('counter-requests'), 2306, 2000);
+                    animateCounter(document.getElementById('counter-acceptance'), 8, 2000, true);
+                    animateCounter(document.getElementById('counter-trades'), 186, 2000);
+
+                    // Disconnect observer after animation
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        // Start observing the stats section
+        document.addEventListener('DOMContentLoaded', function () {
+            const statsSection = document.getElementById('stats-section');
+            if (statsSection) {
+                observer.observe(statsSection);
+            }
+        });
+    </script>
+
+    <footer class="bg-gray-800 border-t border-gray-700 mt-20">
+        <div class="max-w-screen-xl mx-auto px-6 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+
+                <!-- Left Side - Company Info -->
+                <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                    <img src="/assets/logos/pso.png" alt="PSO Logo" class="w-12 h-12 object-contain" />
+                    <div>
+                        <div class="text-xl font-bold text-white">Pakistan State Oil</div>
+                        <div class="text-sm text-gray-400">Channel Development Department</div>
+                    </div>
+                </div>
+
+                <!-- Right Side - Contact Info -->
+                <div class="flex items-center space-x-4 text-sm text-gray-400">
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                        </svg>
+                        <span class="text-green-400">support@pso.com.pk</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom -->
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center">
+                <p class="text-sm text-gray-500">
+                    © 2025 Pakistan State Oil Company Limited • Powered by Interns • Secure & ISO Compliant
+                </p>
+            </div>
+        </div>
+    </footer>
+
+</body>
+
+</html>

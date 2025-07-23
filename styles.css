@@ -1,0 +1,247 @@
+/* =============================================================================
+   Minimal Custom Styles - Only what Tailwind CSS cannot handle
+   ============================================================================= */
+
+/* =============================================================================
+   1. Custom Keyframe Animations (Not available in Tailwind)
+   ============================================================================= */
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Apply to edit toolbox when shown */
+#edit-toolbox:not(.hidden) {
+    animation: slideUp 0.3s ease-out;
+}
+
+/* =============================================================================
+   2. Custom Scrollbar Styling (Webkit-specific, not in Tailwind)
+   ============================================================================= */
+
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f8fafc;
+    border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Station card hover effects */
+.station-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 51, 102, 0.1);
+}
+
+/* Ensure proper text wrapping in cards */
+.station-card h4 {
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+/* Results list spacing */
+#results-list {
+    scroll-behavior: smooth;
+}
+
+/* Compact filter buttons */
+.filter-btn {
+    min-width: 60px;
+}
+
+/* Support for Urdu/Arabic text rendering */
+.station-card h4 {
+    word-wrap: break-word;
+    hyphens: auto;
+    direction: auto;
+    unicode-bidi: plaintext;
+    line-height: 1.3;
+}
+
+/* Better text rendering for mixed language content */
+.station-card {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================================================
+   3. Focus Mode Pseudo-element Indicator (::before content not in Tailwind)
+   ============================================================================= */
+
+.focus-mode-active::before {
+    content: "🎯 Focus View";
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(5, 150, 105, 0.9);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    z-index: 1001;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Focus mode map enhancements */
+.focus-mode-active {
+    border: 2px solid #059669 !important;
+    box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.1), 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+.focus-mode-active .leaflet-tile {
+    filter: saturate(0.4) contrast(1.1) brightness(1.1);
+}
+
+.focus-mode-active .leaflet-marker-icon[src*="assets/logos"] {
+    filter: brightness(1.1) contrast(1.2) saturate(1.3) drop-shadow(0 2px 8px rgba(0,0,0,0.2));
+    transform: scale(1.1);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 2px;
+    border: 2px solid rgba(5, 150, 105, 0.3);
+}
+
+/* =============================================================================
+   4. Filter Button States (JavaScript toggle classes)
+   ============================================================================= */
+
+.filter-btn-active {
+    background: #FFD700 !important;
+    color: #003366 !important;
+    border-color: #FFD700 !important;
+}
+
+/* Filter button inactive state reset */
+.filter-btn:not(.filter-btn-active) {
+    background: #f9fafb !important;
+    color: #003366 !important;
+    border-color: #e5e7eb !important;
+}
+
+/* =============================================================================
+   6. Loading Screen & Application Initialization
+   ============================================================================= */
+
+#app-loading {
+    transition: opacity 0.3s ease-out;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* =============================================================================
+   7. Custom Map Marker Styles (Leaflet integration)
+   ============================================================================= */
+
+.custom-text-marker,
+.custom-image-marker {
+    background: none !important;
+    border: none !important;
+}
+
+.distance-label span {
+    text-shadow: 0 1px 4px #fff, 0 0 2px #fff !important;
+}
+
+/* =============================================================================
+   8. Loading Animation (Custom spin for search button)
+   ============================================================================= */
+
+.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* =============================================================================
+   9. Accessibility Enhancements (Not fully covered by Tailwind)
+   ============================================================================= */
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+    button {
+        border: 2px solid currentColor !important;
+    }
+}
+
+/* =============================================================================
+   10. Print Styles (Custom overrides for printing)
+   ============================================================================= */
+
+@media print {
+    button,
+    .no-print,
+    #edit-toolbox,
+    #app-loading {
+        display: none !important;
+    }
+    
+    .focus-mode-active::before {
+        display: none !important;
+    }
+    
+    .station-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+    
+    #results-list {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    
+    * {
+        color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+/* =============================================================================
+   11. Component State Classes (Not achievable with Tailwind utilities)
+   ============================================================================= */
+
+/* No data state for statistics cards */
+.stat-card.no-data {
+    opacity: 0.6;
+    background: #f3f4f6 !important;
+    border-style: dashed !important;
+}
+
+/* Coverage percentage text shadow */
+.coverage-text-shadow {
+    text-shadow: 1px 1px 2px #003366;
+}
