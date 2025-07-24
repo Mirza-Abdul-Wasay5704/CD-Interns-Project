@@ -44,11 +44,6 @@ let elementIdCounter = 0;
             map.on('click', function(e) {
                 document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
                 document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
-                // Save clicked coordinates for SSM import
-                localStorage.setItem('mapLatitude', e.latlng.lat);
-                localStorage.setItem('mapLongitude', e.latlng.lng);
-                sessionStorage.setItem('selectedLatitude', e.latlng.lat);
-                sessionStorage.setItem('selectedLongitude', e.latlng.lng);
             });
         }
 
@@ -62,12 +57,6 @@ let elementIdCounter = 0;
                 alert('Please enter valid coordinates and radius');
                 return;
             }
-
-            // Save searched coordinates for SSM import
-            localStorage.setItem('mapLatitude', lat);
-            localStorage.setItem('mapLongitude', lng);
-            sessionStorage.setItem('selectedLatitude', lat);
-            sessionStorage.setItem('selectedLongitude', lng);
 
             const searchBtn = document.getElementById('searchBtn');
             searchBtn.disabled = true;
@@ -1268,323 +1257,491 @@ let elementIdCounter = 0;
                 ];
             }
         }
-
         // Initialize station fetcher
-        const stationFetcher = new StationFetcher();
+const stationFetcher = new StationFetcher();
 
-        // Initialize map
-        function initMap() {
-            map = L.map('map').setView([25.3730, 68.3512], 12);
+// Store for distances calculated via Leaflet Routing Machine
+let routingDistances = new Map();
 
-            // Layer Control
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
+// Initialize map
+function initMap() {
+    map = L.map('map').setView([25.3730, 68.3512], 12);
+
+    // Layer Control
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    });
+
+    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri'
+    });
+
+    const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap'
+    });
+
+    // Add default layer
+    osmLayer.addTo(map);
+
+    // Layer control
+    const baseLayers = {
+        "Street Map": osmLayer,
+        "Satellite": satelliteLayer,
+        "Terrain": terrainLayer
+    };
+
+    L.control.layers(baseLayers).addTo(map);
+
+    // Map click event
+    map.on('click', function (e) {
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    });
+}
+
+// Get accurate distance using Leaflet Routing Machine
+function getDistanceWithLRM(startLat, startLng, endLat, endLng) {
+    return new Promise((resolve, reject) => {
+        // Create invisible routing control (no UI)
+        const routingControl = L.Routing.control({
+            waypoints: [
+                L.latLng(startLat, startLng),
+                L.latLng(endLat, endLng)
+            ],
+            createMarker: function() { return null; }, // No markers
+            addWaypoints: false, // No dragging
+            routeWhileDragging: false,
+            show: false, // Hide the control panel
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1'
+            })
+        });
+
+        // Listen for route calculation
+        routingControl.on('routesfound', function(e) {
+            const route = e.routes[0];
+            const distanceKm = route.summary.totalDistance / 1000; // Convert to km
+            const timeSeconds = route.summary.totalTime;
+            
+            // Remove the routing control (cleanup)
+            routingControl.remove();
+            
+            resolve({
+                distance: distanceKm,
+                time: timeSeconds,
+                source: 'Leaflet Routing Machine (OSRM)'
             });
+        });
 
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: '© Esri'
-            });
+        // Handle routing errors
+        routingControl.on('routingerror', function(e) {
+            routingControl.remove();
+            reject(new Error(`Routing failed: ${e.error.message || 'Unknown error'}`));
+        });
 
-            const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenTopoMap'
-            });
-
-            // Add default layer
-            osmLayer.addTo(map);
-
-            // Layer control
-            const baseLayers = {
-                "Street Map": osmLayer,
-                "Satellite": satelliteLayer,
-                "Terrain": terrainLayer
-            };
-
-            L.control.layers(baseLayers).addTo(map);
-
-            // Map click event
-            map.on('click', function (e) {
-                document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
-                document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
-            });
-        }
-
-        // Search function
-        async function searchStations() {
-            const lat = parseFloat(document.getElementById('latitude').value);
-            const lng = parseFloat(document.getElementById('longitude').value);
-            const radius = parseFloat(document.getElementById('radius').value);
-
-            if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius <= 0) {
-                alert('Please enter valid coordinates and radius');
-                return;
+        // Don't add to map visually, just calculate
+        // routingControl.addTo(map); // Commented out to keep invisible
+        
+        // Trigger route calculation
+        setTimeout(() => {
+            if (!routingControl._routes || routingControl._routes.length === 0) {
+                // Force route calculation if it didn't start automatically
+                routingControl._route();
             }
+        }, 100);
+    });
+}
 
-            const searchBtn = document.getElementById('searchBtn');
-            searchBtn.disabled = true;
-            searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
-
-            // Show loading
-            document.getElementById('results-list').innerHTML = `
-                <div class="loading">
-                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                    <p>Searching for fuel stations...</p>
-                </div>
-            `;
-
+// Batch process distances with Leaflet Routing Machine
+async function fetchDistancesWithLRM(searchLat, searchLng, stations) {
+    console.log(`🗺️  Calculating distances with Leaflet Routing Machine for ${stations.length} stations...`);
+    
+    const results = [];
+    const batchSize = 3; // Process 3 at a time to avoid overwhelming OSRM
+    
+    for (let i = 0; i < stations.length; i += batchSize) {
+        const batch = stations.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (station, index) => {
             try {
-                // Clear previous markers
-                clearMap();
-
-                // Set map view to search location and zoom in
-                map.setView([lat, lng], 14);
-
-                // Add search marker with better styling
-                const searchMarker = L.marker([lat, lng], {
-                    icon: L.divIcon({
-                        html: `
-      <div style="width: 32px; height: 32px;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="#3b82f6" viewBox="0 0 24 24">
-          <path fill-rule="evenodd" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 6 13 6 13s6-8.03 6-13c0-3.314-2.686-6-6-6zm0 8a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-        </svg>
-      </div>
-    `,
-                        className: 'custom-marker',
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 32], // adjusts anchor to pointy bottom
-                    })
-                }).addTo(map);
-                // Add radius circle with better styling
-                radiusCircle = L.circle([lat, lng], {
-                    color: '#10b981',
-                    fillColor: '#34d399',
-                    fillOpacity: 0.1,
-                    weight: 2,
-                    radius: radius * 1000
-                }).addTo(map);
-
-                // Use real API to fetch stations
-                const stations = await stationFetcher.fetchFuelStations(lat, lng, radius);
-                displayStationResults(stations);
-                updateStatistics(stations);
-
+                const result = await getDistanceWithLRM(searchLat, searchLng, station.lat, station.lng);
+                
+                // Update station with accurate data
+                station.distance = result.distance;
+                station.travelTime = result.time;
+                station.distanceSource = result.source;
+                
+                console.log(`✅ ${station.name}: ${result.distance.toFixed(2)}km (${Math.round(result.time/60)}min)`);
+                return station;
+                
             } catch (error) {
-                document.getElementById('results-list').innerHTML = `
-                    <div class="error">
-                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                        <p>Error searching for stations</p>
-                    </div>
-                `;
-            } finally {
-                searchBtn.disabled = false;
-                searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search Stations';
+                console.warn(`❌ Error calculating route for ${station.name}:`, error.message);
+                // Keep original distance if routing fails
+                station.distanceSource = 'Direct (fallback)';
+                return station;
             }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+        
+        // Small delay between batches to be respectful to OSRM
+        if (i + batchSize < stations.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        
+        // Update progress
+        console.log(`📊 Progress: ${Math.min(i + batchSize, stations.length)}/${stations.length} stations processed`);
+    }
+    
+    // Sort by accurate distance
+    stations.sort((a, b) => a.distance - b.distance);
+    
+    console.log('🎉 All distances calculated with Leaflet Routing Machine!');
+    return stations;
+}
 
+// Search function (updated)
+async function searchStations() {
+    const lat = parseFloat(document.getElementById('latitude').value);
+    const lng = parseFloat(document.getElementById('longitude').value);
+    const radius = parseFloat(document.getElementById('radius').value);
 
+    if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius <= 0) {
+        alert('Please enter valid coordinates and radius');
+        return;
+    }
 
-        // Display station results
-        function displayStationResults(stations) {
-            currentStations = stations;
-            filteredStations = stations;
+    const searchBtn = document.getElementById('searchBtn');
+    searchBtn.disabled = true;
+    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
 
-            if (stations.length === 0) {
-                document.getElementById('results-list').innerHTML = `
-                    <div class="error">
-                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                        <p>No fuel stations found</p>
+    // Show loading
+    document.getElementById('results-list').innerHTML = `
+        <div class="loading">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p>Searching for fuel stations...</p>
+        </div>
+    `;
+
+    try {
+        // Clear previous markers
+        clearMap();
+
+        // Set map view to search location and zoom in
+        map.setView([lat, lng], 14);
+
+        // Add search marker
+        const searchMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                html: `
+  <div style="width: 32px; height: 32px;">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="#3b82f6" viewBox="0 0 24 24">
+      <path fill-rule="evenodd" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 6 13 6 13s6-8.03 6-13c0-3.314-2.686-6-6-6zm0 8a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+    </svg>
+  </div>
+`,
+                className: 'custom-marker',
+                iconSize: [32, 32],
+                iconAnchor: [16, 32],
+            })
+        }).addTo(map);
+
+        // Add radius circle
+        radiusCircle = L.circle([lat, lng], {
+            color: '#10b981',
+            fillColor: '#34d399',
+            fillOpacity: 0.1,
+            weight: 2,
+            radius: radius * 1000
+        }).addTo(map);
+
+        // Fetch stations
+        const stations = await stationFetcher.fetchFuelStations(lat, lng, radius);
+        
+        // Show initial results
+        displayStationResults(stations);
+        
+        // Update loading message
+        document.getElementById('results-list').innerHTML = `
+            <div class="loading">
+                <i class="fas fa-route fa-spin text-2xl mb-2"></i>
+                <p>Calculating precise road distances...</p>
+                <div class="text-sm text-gray-400 mt-2">
+                    Using Leaflet Routing Machine + OSRM for accuracy
+                </div>
+            </div>
+        `;
+
+        // Calculate accurate distances with Leaflet Routing Machine
+        await fetchDistancesWithLRM(lat, lng, stations);
+        
+        // Re-display with accurate distances
+        displayStationResults(stations);
+        updateStatistics(stations);
+
+    } catch (error) {
+        document.getElementById('results-list').innerHTML = `
+            <div class="error">
+                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                <p>Error searching for stations</p>
+            </div>
+        `;
+    } finally {
+        searchBtn.disabled = false;
+        searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search Stations';
+    }
+}
+
+// Display station results
+function displayStationResults(stations) {
+    currentStations = stations;
+    filteredStations = stations;
+
+    if (stations.length === 0) {
+        document.getElementById('results-list').innerHTML = `
+            <div class="error">
+                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                <p>No fuel stations found</p>
+            </div>
+        `;
+        return;
+    }
+
+    renderStationList(stations);
+    addStationMarkers(stations);
+}
+
+// Render station list (updated)
+function renderStationList(stations) {
+    const searchLat = parseFloat(document.getElementById('latitude').value);
+    const searchLng = parseFloat(document.getElementById('longitude').value);
+
+    const html = stations.map(station => `
+        <div class="station-card bg-gray-700 border border-gray-600 rounded-lg p-4">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex items-center">
+                    <img src="${APP_CONFIG.BRAND_LOGOS[station.brand]}" alt="${station.brand}" class="w-8 h-8 object-contain mr-3 rounded-full bg-white p-1" />
+                    <h4 class="text-lg font-bold text-white">${station.name}</h4>
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs font-bold ${getBrandBadgeColor(station.brand)}">
+                    ${station.brand}
+                </span>
+            </div>
+            
+            <div class="flex items-center text-gray-300 mb-2">
+                <i class="fas fa-route mr-2 text-green-400"></i>
+                <span>${station.distance.toFixed(2)} km</span>
+                ${station.travelTime ? `
+                    <span class="ml-2 text-xs text-blue-400">
+                        (~${Math.round(station.travelTime/60)} min)
+                    </span>
+                ` : ''}
+                ${station.distanceSource ? `
+                    <span class="ml-2 text-xs px-2 py-1 rounded ${getDistanceSourceBadge(station.distanceSource)}">
+                        LRM
+                    </span>
+                ` : ''}
+                <div class="flex items-center ml-4">
+                    ${generateStarRating(station.rating)}
+                    <span class="ml-1 text-sm">${station.rating.toFixed(1)}/5</span>
+                </div>
+            </div>
+
+            <div class="flex items-center text-gray-300 mb-2">
+                <i class="fas fa-map-signs mr-2 text-blue-400"></i>
+                <span class="text-sm">${station.address}</span>
+            </div>
+
+            ${station.phone !== 'N/A' ? `
+            <div class="flex items-center text-gray-300 mb-2">
+                <i class="fas fa-phone mr-2 text-purple-400"></i>
+                <span class="text-sm">${station.phone}</span>
+            </div>
+            ` : ''}
+            
+            <div class="flex items-center text-gray-300 mb-3">
+                <i class="fas fa-rupee-sign mr-2 text-yellow-400"></i>
+                <span>Rs. ${station.price}/L</span>
+            </div>
+            
+            <div class="flex gap-2 flex-wrap mb-3">
+                ${station.services ? station.services.map(service => `
+                    <span class="px-2 py-1 bg-gray-600 text-gray-200 text-xs rounded">${service}</span>
+                `).join('') : ''}
+            </div>
+
+            <button onclick="getDirections(${station.lat}, ${station.lng})" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center">
+                <i class="fas fa-directions mr-2"></i>
+                Get Directions (${station.distance.toFixed(2)} km)
+            </button>
+        </div>
+    `).join('');
+
+    document.getElementById('results-list').innerHTML = html;
+}
+
+// Get distance source badge styling
+function getDistanceSourceBadge(source) {
+    if (source.includes('Routing Machine')) {
+        return 'bg-green-600 text-white';
+    }
+    return 'bg-gray-600 text-white';
+}
+
+// Get brand badge color
+function getBrandBadgeColor(brand) {
+    const colors = {
+        'PSO': 'bg-green-600 text-white',
+        'Shell': 'bg-yellow-500 text-black',
+        'Total': 'bg-red-600 text-white',
+        'Attock': 'bg-orange-600 text-white',
+        'Hascol': 'bg-blue-600 text-white',
+        'Caltex': 'bg-purple-600 text-white',
+        'Byco': 'bg-pink-600 text-white'
+    };
+    return colors[brand] || 'bg-gray-600 text-white';
+}
+
+// Get directions function
+function getDirections(stationLat, stationLng) {
+    const searchLat = parseFloat(document.getElementById('latitude').value);
+    const searchLng = parseFloat(document.getElementById('longitude').value);
+
+    if (isNaN(searchLat) || isNaN(searchLng)) {
+        alert('Please set search coordinates first');
+        return;
+    }
+
+    // Open Google Maps with directions
+    const url = `https://www.google.com/maps/dir/${searchLat},${searchLng}/${stationLat},${stationLng}`;
+    window.open(url, '_blank');
+}
+
+// Generate star rating
+function generateStarRating(rating) {
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        stars += `<i class="fas fa-star ${i <= rating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
+    }
+    return stars;
+}
+
+// Add station markers to map (with straight lines + accurate distances)
+function addStationMarkers(stations) {
+    const searchLat = parseFloat(document.getElementById('latitude').value);
+    const searchLng = parseFloat(document.getElementById('longitude').value);
+
+    stations.forEach(station => {
+        // Create marker with brand logo
+        const logoUrl = APP_CONFIG.BRAND_LOGOS[station.brand];
+
+        const marker = L.marker([station.lat, station.lng], {
+            icon: L.divIcon({
+                html: `
+                    <div class="w-10 h-10 bg-white rounded-full border-2 border-gray-300 shadow-lg flex items-center justify-center overflow-hidden transform transition-transform hover:scale-110">
+                        <img src="${logoUrl}" alt="${station.brand}" class="w-8 h-8 object-contain rounded-full" />
                     </div>
-                `;
-                return;
-            }
+                `,
+                className: 'custom-marker',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            })
+        }).addTo(map);
 
-            renderStationList(stations);
-            addStationMarkers(stations);
-        }
+        // Add straight connection line (visual)
+        const isPSO = station.brand === 'PSO';
+        addConnectionLine(searchLat, searchLng, station, isPSO);
 
-        // Render station list
-        function renderStationList(stations) {
-            const searchLat = parseFloat(document.getElementById('latitude').value);
-            const searchLng = parseFloat(document.getElementById('longitude').value);
-
-            const html = stations.map(station => `
-                <div class="station-card bg-gray-700 border border-gray-600 rounded-lg p-4">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex items-center">
-                            <img src="${APP_CONFIG.BRAND_LOGOS[station.brand]}" alt="${station.brand}" class="w-8 h-8 object-contain mr-3 rounded-full bg-white p-1" />
-                            <h4 class="text-lg font-bold text-white">${station.name}</h4>
-                        </div>
-                        <span class="px-3 py-1 rounded-full text-xs font-bold ${getBrandBadgeColor(station.brand)}">
-                            ${station.brand}
-                        </span>
+        // Enhanced popup with routing data
+        marker.bindPopup(`
+            <div class="min-w-64 p-3 text-gray-800">
+                <div class="flex items-center mb-2">
+                    <img src="${logoUrl}" alt="${station.brand}" class="w-6 h-6 object-contain mr-2 rounded-full" />
+                    <h4 class="text-lg font-bold ${isPSO ? 'text-green-600' : 'text-blue-600'}">${station.name}</h4>
+                </div>
+                <p class="text-gray-600 text-sm mb-2">${station.address}</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center">
+                        <i class="fas fa-route text-green-500 mr-2"></i>
+                        <span class="font-semibold">${station.distance.toFixed(2)} km by road</span>
+                        ${station.travelTime ? `
+                            <span class="ml-2 text-blue-600">(~${Math.round(station.travelTime/60)}min)</span>
+                        ` : ''}
                     </div>
-                    
-                    <div class="flex items-center text-gray-300 mb-2">
-                        <i class="fas fa-map-marker-alt mr-2 text-green-400"></i>
-                        <span>${station.distance.toFixed(2)} km</span>
-                        <div class="flex items-center ml-4">
-                            ${generateStarRating(station.rating)}
-                            <span class="ml-1 text-sm">${station.rating.toFixed(1)}/5</span>
-                        </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-rupee-sign text-blue-500 mr-2"></i>
+                        <span class="font-semibold">Rs. ${station.price}/L</span>
                     </div>
-
-                    <div class="flex items-center text-gray-300 mb-2">
-                        <i class="fas fa-map-signs mr-2 text-blue-400"></i>
-                        <span class="text-sm">${station.address}</span>
-                    </div>
-
                     ${station.phone !== 'N/A' ? `
-                    <div class="flex items-center text-gray-300 mb-2">
-                        <i class="fas fa-phone mr-2 text-purple-400"></i>
-                        <span class="text-sm">${station.phone}</span>
+                    <div class="flex items-center">
+                        <i class="fas fa-phone text-gray-500 mr-2"></i>
+                        <span>${station.phone}</span>
                     </div>
                     ` : ''}
-                    
-                    <div class="flex items-center text-gray-300 mb-3">
-                        <i class="fas fa-rupee-sign mr-2 text-yellow-400"></i>
-                        <span>Rs. ${station.price}/L</span>
+                    <div class="flex items-center">
+                        ${generateStarRating(station.rating)}
+                        <span class="ml-2">${station.rating.toFixed(1)}/5</span>
                     </div>
-                    
-                    <div class="flex gap-2 flex-wrap mb-3">
-                        ${station.services ? station.services.map(service => `
-                            <span class="px-2 py-1 bg-gray-600 text-gray-200 text-xs rounded">${service}</span>
-                        `).join('') : ''}
+                    ${station.distanceSource ? `
+                    <div class="text-xs text-gray-500 mt-2">
+                        📊 Distance via: ${station.distanceSource}
                     </div>
-
-                    <button onclick="getDirections(${station.lat}, ${station.lng})" 
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center">
-                        <i class="fas fa-directions mr-2"></i>
-                        Get Directions (${station.distance.toFixed(2)} km)
-                    </button>
+                    ` : ''}
                 </div>
-            `).join('');
+                <button onclick="getDirections(${station.lat}, ${station.lng})" class="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium transition-colors">
+                    <i class="fas fa-directions mr-2"></i>Get Directions
+                </button>
+            </div>
+        `);
 
-            document.getElementById('results-list').innerHTML = html;
-        }
+        // Add accurate distance label
+        addAccurateDistanceLabel(searchLat, searchLng, station);
+    });
 
-        // Get brand badge color
-        function getBrandBadgeColor(brand) {
-            const colors = {
-                'PSO': 'bg-green-600 text-white',
-                'Shell': 'bg-yellow-500 text-black',
-                'Total': 'bg-red-600 text-white',
-                'Attock': 'bg-orange-600 text-white',
-                'Hascol': 'bg-blue-600 text-white',
-                'Caltex': 'bg-purple-600 text-white',
-                'Byco': 'bg-pink-600 text-white'
-            };
-            return colors[brand] || 'bg-gray-600 text-white';
-        }
+    // Fit map to show all stations
+    if (stations.length > 0) {
+        const group = new L.featureGroup(stations.map(station => L.marker([station.lat, station.lng])));
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+}
 
-        // Get directions function
-        function getDirections(stationLat, stationLng) {
-            const searchLat = parseFloat(document.getElementById('latitude').value);
-            const searchLng = parseFloat(document.getElementById('longitude').value);
+// Add connection line (straight line for visual)
+function addConnectionLine(searchLat, searchLng, station, isPSO) {
+    const latlngs = [[searchLat, searchLng], [station.lat, station.lng]];
 
-            if (isNaN(searchLat) || isNaN(searchLng)) {
-                alert('Please set search coordinates first');
-                return;
-            }
+    L.polyline(latlngs, {
+        color: isPSO ? '#10b981' : '#ef4444',
+        weight: 3,
+        opacity: 0.8,
+        className: isPSO ? 'glow-line-green' : 'glow-line-red'
+    }).addTo(map);
+}
 
-            // Open Google Maps with directions
-            const url = `https://www.google.com/maps/dir/${searchLat},${searchLng}/${stationLat},${stationLng}`;
-            window.open(url, '_blank');
-        }
+// Add accurate distance label (shows LRM calculated distance)
+function addAccurateDistanceLabel(searchLat, searchLng, station) {
+    const midLat = (searchLat + station.lat) / 2;
+    const midLng = (searchLng + station.lng) / 2;
 
-        // Generate star rating
-        function generateStarRating(rating) {
-            let stars = '';
-            for (let i = 1; i <= 5; i++) {
-                stars += `<i class="fas fa-star ${i <= rating ? 'text-yellow-400' : 'text-gray-600'}"></i>`;
-            }
-            return stars;
-        }
-
-        // Add station markers to map
-        function addStationMarkers(stations) {
-            const searchLat = parseFloat(document.getElementById('latitude').value);
-            const searchLng = parseFloat(document.getElementById('longitude').value);
-
-            stations.forEach(station => {
-                // Create marker with brand logo instead of icon
-                const logoUrl = APP_CONFIG.BRAND_LOGOS[station.brand];
-
-                const marker = L.marker([station.lat, station.lng], {
-                    icon: L.divIcon({
-                        html: `
-                            <div class="w-10 h-10 bg-white rounded-full border-2 border-gray-300 shadow-lg flex items-center justify-center overflow-hidden transform transition-transform hover:scale-110">
-                                <img src="${logoUrl}" alt="${station.brand}" class="w-8 h-8 object-contain rounded-full" />
-                            </div>
-                        `,
-                        className: 'custom-marker',
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20]
-                    })
-                }).addTo(map);
-
-                // Add connection line to search point
-                const isPSO = station.brand === 'PSO';
-                addConnectionLine(searchLat, searchLng, station, isPSO);
-
-                // Enhanced popup with actual OSM data
-                marker.bindPopup(`
-                    <div class="min-w-64 p-3 text-gray-800">
-                        <div class="flex items-center mb-2">
-                            <img src="${logoUrl}" alt="${station.brand}" class="w-6 h-6 object-contain mr-2 rounded-full" />
-                            <h4 class="text-lg font-bold ${isPSO ? 'text-green-600' : 'text-blue-600'}">${station.name}</h4>
-                        </div>
-                        <p class="text-gray-600 text-sm mb-2">${station.address}</p>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex items-center">
-                                <i class="fas fa-map-marker-alt text-green-500 mr-2"></i>
-                                <span class="font-semibold">${station.distance.toFixed(2)} km away</span>
-                            </div>
-                            <div class="flex items-center">
-                                <i class="fas fa-rupee-sign text-blue-500 mr-2"></i>
-                                <span class="font-semibold">Rs. ${station.price}/L</span>
-                            </div>
-                            ${station.phone !== 'N/A' ? `
-                            <div class="flex items-center">
-                                <i class="fas fa-phone text-gray-500 mr-2"></i>
-                                <span>${station.phone}</span>
-                            </div>
-                            ` : ''}
-                            ${station.opening_hours !== 'N/A' && station.opening_hours !== '24/7' ? `
-                            <div class="flex items-center">
-                                <i class="fas fa-clock text-purple-500 mr-2"></i>
-                                <span>${station.opening_hours}</span>
-                            </div>
-                            ` : ''}
-                            <div class="flex items-center">
-                                ${generateStarRating(station.rating)}
-                                <span class="ml-2">${station.rating.toFixed(1)}/5</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
-                            <span class="bg-${isPSO ? 'green' : 'blue'}-100 text-${isPSO ? 'green' : 'blue'}-800 px-3 py-1 rounded-full text-xs font-bold">
-                                ${station.brand}
-                            </span>
-                            <div class="flex gap-1 flex-wrap">
-                                ${station.services ? station.services.slice(0, 3).map(service => `
-                                    <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">${service}</span>
-                                `).join('') : ''}
-                            </div>
-                        </div>
-                        <button onclick="getDirections(${station.lat}, ${station.lng})" class="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded text-sm font-medium transition-colors">
-                            <i class="fas fa-directions mr-2"></i>Get Directions
-                        </button>
-                    </div>
-                `);
-
-                // Add distance label
-                addDistanceLabel(searchLat, searchLng, station);
-            });
-
-            // Fit map to show all stations
-            if (stations.length > 0) {
-                const group = new L.featureGroup(stations.map(station => L.marker([station.lat, station.lng])));
-                map.fitBounds(group.getBounds().pad(0.1));
-            }
-        }
+    const distanceLabel = L.marker([midLat, midLng], {
+        icon: L.divIcon({
+            className: 'accurate-distance-label',
+            html: `
+                <div class="bg-white px-3 py-1 rounded-full shadow-lg border-2 border-gray-300 text-center">
+                    <div class="font-bold text-gray-800 text-sm">${station.distance.toFixed(1)} km</div>
+                    ${station.travelTime ? `
+                        <div class="text-xs text-blue-600">~${Math.round(station.travelTime/60)}min</div>
+                    ` : ''}
+                   
+                </div>
+            `,
+            iconSize: [80, 50],
+            iconAnchor: [40, 25]
+        }),
+        interactive: false
+    }).addTo(map);
+}
 
         // Get brand color for markers
         function getBrandColor(brand) {
