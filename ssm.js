@@ -79,61 +79,6 @@ function setupEventListeners() {
     });
 }
 
-// Sync coordinates from map page
-function syncCoordinatesFromMap() {
-    try {
-        // Try multiple methods to get coordinates
-        const urlParams = new URLSearchParams(window.location.search);
-        let lat = urlParams.get('lat');
-        let lng = urlParams.get('lng');
-        
-        // Try localStorage if URL params not available
-        if (!lat || !lng) {
-            lat = localStorage.getItem('mapLatitude');
-            lng = localStorage.getItem('mapLongitude');
-        }
-        
-        // Try sessionStorage as backup
-        if (!lat || !lng) {
-            lat = sessionStorage.getItem('selectedLatitude');
-            lng = sessionStorage.getItem('selectedLongitude');
-        }
-        
-        if (lat && lng) {
-            document.getElementById('ssm-latitude').value = parseFloat(lat).toFixed(6);
-            document.getElementById('ssm-longitude').value = parseFloat(lng).toFixed(6);
-            
-            showTemporaryMessage('✅ Coordinates synced from map successfully!', 'success');
-            return true;
-        } else {
-            showTemporaryMessage('⚠️ No coordinates found. Please enter manually or visit Map page first.', 'warning');
-            return false;
-        }
-    } catch (error) {
-        console.error('Error syncing coordinates:', error);
-        showTemporaryMessage('❌ Error syncing coordinates from map.', 'error');
-        return false;
-    }
-}
-
-// Validate coordinate inputs
-function validateCoordinates() {
-    const lat = parseFloat(document.getElementById('ssm-latitude').value);
-    const lng = parseFloat(document.getElementById('ssm-longitude').value);
-    
-    const latValid = !isNaN(lat) && lat >= -90 && lat <= 90;
-    const lngValid = !isNaN(lng) && lng >= -180 && lng <= 180;
-    
-    const analyzeBtn = document.getElementById('analyzeSSMBtn');
-    
-    if (latValid && lngValid) {
-        analyzeBtn.disabled = false;
-        analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    } else {
-        analyzeBtn.disabled = true;
-        analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed');
-    }
-}
 
 // Update site type display
 function updateSiteTypeDisplay() {
@@ -147,7 +92,49 @@ function updateSiteTypeDisplay() {
     }
 }
 
-// Main SSM Analysis Function
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+function loadCoordinatesFromCookies() {
+    const savedLat = getCookie('map_latitude');
+    const savedLng = getCookie('map_longitude');
+    const savedRadius = getCookie('map_radius');
+    
+    if (savedLat && savedLng && savedRadius) {
+        // Auto-fill the input fields
+        document.getElementById('ssm-latitude').value = savedLat;
+        document.getElementById('ssm-longitude').value = savedLng;
+        document.getElementById('ssm-radius').value = savedRadius;
+        
+        console.log('Coordinates loaded from cookies:', { 
+            lat: savedLat, 
+            lng: savedLng, 
+            radius: savedRadius 
+        });
+        
+        // Optional: Show a brief notification that coordinates were loaded
+            Toastify({
+        text: "Coordinates loaded from previous search",
+        duration: 2000,
+        gravity: "top",
+        position: "right",
+        offset: {
+            y: 80
+        },
+        className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+        stopOnFocus: true
+    }).showToast();
+            }
+}
+
 async function performSSMAnalysis() {
     if (analysisInProgress) {
         showTemporaryMessage('⏳ Analysis already in progress...', 'info');
@@ -1256,17 +1243,14 @@ function validatePakistanCoordinates() {
 
 // Enhanced page initialization
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 PSO Site Selection Metrics System Initialized');
     
-    // Initialize from URL if parameters present
-    initializeFromURL();
-    
-    // Enhanced coordinate validation
+    loadCoordinatesFromCookies();
+   
     document.getElementById('ssm-latitude').addEventListener('input', validatePakistanCoordinates);
     document.getElementById('ssm-longitude').addEventListener('input', validatePakistanCoordinates);
     
     // Try to sync coordinates from map
-    syncCoordinatesFromMap();
+    // syncCoordinatesFromMap();
     
     // Setup event listeners
     setupEventListeners();
@@ -1280,6 +1264,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Make functions globally available
 window.performSSMAnalysis = performSSMAnalysis;
-window.syncCoordinatesFromMap = syncCoordinatesFromMap;
 window.exportSSMResults = exportSSMResults;
 window.printSSMReport = printSSMReport;

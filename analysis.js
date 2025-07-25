@@ -5,11 +5,13 @@ let currentAnalysisData = {};
 
 // Initialize the map
 function initMap() {
-    const lat = parseFloat(document.getElementById('latitude').value);
-    const lng = parseFloat(document.getElementById('longitude').value);
+    // const lat = parseFloat(document.getElementById('latitude').value);
+    // const lng = parseFloat(document.getElementById('longitude').value);
+    const lat = getCookie('map_latitude') || 24.8607; // Default to Islamabad
+    const lng = getCookie('map_longitude') || 67.0011; // Default to Islamabad
     
     map = L.map('analysisMap').setView([lat, lng], 13);
-    
+    console.log('Map initialized at:', { lat, lng });
     // Add OpenStreetMap tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
@@ -276,11 +278,11 @@ function analyzeLandUse(data) {
 // Determine site type based on road network
 function determineSiteType(analysis) {
     const { highways, primary, secondary } = analysis.roads;
-    
-    if (highways > 0) {
-        return 'Highway';
-    } else if (primary > 2 || secondary > 5) {
+    console.log(analysis.roads);
+    if (highways <= 7 && primary > 2 && secondary > 5) {
         return 'City';
+    } else if (highways > 0) {
+        return 'Highway';
     } else if (primary > 0 || secondary > 0) {
         return 'Urban';
     } else {
@@ -593,6 +595,56 @@ function hideLoading() {
     `;
 }
 
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+function setCookie(name, value, days) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+}
+
+function loadCoordinatesFromCookies() {
+    const savedLat = getCookie('map_latitude');
+    const savedLng = getCookie('map_longitude');
+    const savedRadius = getCookie('map_radius');
+    
+    if (savedLat && savedLng && savedRadius) {
+        // Auto-fill the input fields
+        document.getElementById('latitude').value = savedLat;
+        document.getElementById('longitude').value = savedLng;
+        document.getElementById('radius').value = savedRadius;
+        
+        console.log('Coordinates loaded from cookies:', { 
+            lat: savedLat, 
+            lng: savedLng, 
+            radius: savedRadius 
+        });
+        
+        // Optional: Show a brief notification that coordinates were loaded
+        Toastify({
+            text: "Coordinates loaded from previous search",
+            duration: 2000,
+            gravity: "top",
+            position: "right",
+            offset: {
+                x: 20,
+                y: 80
+            },
+            className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+            stopOnFocus: true
+        }).showToast();
+        }
+}
+
 // Main analysis function
 async function startAnalysis() {
     const lat = parseFloat(document.getElementById('latitude').value);
@@ -647,6 +699,7 @@ async function startAnalysis() {
 
 // Initialize everything when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    loadCoordinatesFromCookies();
     initMap();
     initChart();
     

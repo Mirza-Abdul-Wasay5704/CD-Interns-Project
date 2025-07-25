@@ -403,6 +403,7 @@ let elementIdCounter = 0;
         }
 
         // Handle zoom changes to scale elements dynamically
+        // Handle zoom changes to scale elements dynamically
         function handleZoomChange() {
             if (!editLayerGroup || !editMode) return;
             
@@ -926,6 +927,7 @@ let elementIdCounter = 0;
 
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            loadCoordinatesFromCookies();
             initMap();
         });
 
@@ -946,13 +948,13 @@ let elementIdCounter = 0;
             },
             MARKER_SIZE: 40,
             BRAND_LOGOS: {
-                'PSO': '/assets/logos/pso.png',
-                'Shell': '/assets/logos/shell.png',
-                'Total': '/assets/logos/total.png',
-                'Attock': '/assets/logos/attock.png',
-                'Hascol': '/assets/logos/hascol.png',
-                'Caltex': '/assets/logos/caltex.png',
-                'Byco': '/assets/logos/byco.png'
+                'PSO': 'assets/logos/pso.png',
+                'Shell': 'assets/logos/shell.png',
+                'Total': 'assets/logos/total.png',
+                'Attock': 'assets/logos/attock.png',
+                'Hascol': 'assets/logos/hascol.png',
+                'Caltex': 'assets/logos/caltex.png',
+                'Byco': 'assets/logos/byco.png'
             }
         };
 
@@ -1401,97 +1403,149 @@ async function fetchDistancesWithLRM(searchLat, searchLng, stations) {
     return stations;
 }
 
-// Search function (updated)
-async function searchStations() {
-    const lat = parseFloat(document.getElementById('latitude').value);
-    const lng = parseFloat(document.getElementById('longitude').value);
-    const radius = parseFloat(document.getElementById('radius').value);
+function setCookie(name, value, days) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+}
 
-    if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius <= 0) {
-        alert('Please enter valid coordinates and radius');
-        return;
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
     }
+    return null;
+}
 
-    const searchBtn = document.getElementById('searchBtn');
-    searchBtn.disabled = true;
-    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
 
-    // Show loading
-    document.getElementById('results-list').innerHTML = `
-        <div class="loading">
-            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-            <p>Searching for fuel stations...</p>
-        </div>
-    `;
-
-    try {
-        // Clear previous markers
-        clearMap();
-
-        // Set map view to search location and zoom in
-        map.setView([lat, lng], 14);
-
-        // Add search marker
-        const searchMarker = L.marker([lat, lng], {
-            icon: L.divIcon({
-                html: `
-  <div style="width: 32px; height: 32px;">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="#3b82f6" viewBox="0 0 24 24">
-      <path fill-rule="evenodd" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 6 13 6 13s6-8.03 6-13c0-3.314-2.686-6-6-6zm0 8a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
-    </svg>
-  </div>
-`,
-                className: 'custom-marker',
-                iconSize: [32, 32],
-                iconAnchor: [16, 32],
-            })
-        }).addTo(map);
-
-        // Add radius circle
-        radiusCircle = L.circle([lat, lng], {
-            color: '#10b981',
-            fillColor: '#34d399',
-            fillOpacity: 0.1,
-            weight: 2,
-            radius: radius * 1000
-        }).addTo(map);
-
-        // Fetch stations
-        const stations = await stationFetcher.fetchFuelStations(lat, lng, radius);
+function loadCoordinatesFromCookies() {
+    const savedLat = getCookie('map_latitude');
+    const savedLng = getCookie('map_longitude');
+    const savedRadius = getCookie('map_radius');
+    
+    if (savedLat && savedLng && savedRadius) {
+        // Auto-fill the input fields
+        document.getElementById('latitude').value = savedLat;
+        document.getElementById('longitude').value = savedLng;
+        document.getElementById('radius').value = savedRadius;
         
-        // Show initial results
-        displayStationResults(stations);
+        console.log('Coordinates loaded from cookies:', { 
+            lat: savedLat, 
+            lng: savedLng, 
+            radius: savedRadius 
+        });
         
-        // Update loading message
+        
+            }
+}
+// Search function (updated)
+    async function searchStations() {
+        const lat = parseFloat(document.getElementById('latitude').value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+        const radius = parseFloat(document.getElementById('radius').value);
+
+        if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius <= 0) {
+            alert('Please enter valid coordinates and radius');
+            return;
+        }
+        setCookie('map_latitude', lat, 7);
+        setCookie('map_longitude', lng, 7);
+        setCookie('map_radius', radius, 7);
+        console.log('Coordinates saved to cookies:', { lat, lng, radius });
+        
+        const searchBtn = document.getElementById('searchBtn');
+        searchBtn.disabled = true;
+        searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
+
+        // Show loading
         document.getElementById('results-list').innerHTML = `
             <div class="loading">
-                <i class="fas fa-route fa-spin text-2xl mb-2"></i>
-                <p>Calculating precise road distances...</p>
-                <div class="text-sm text-gray-400 mt-2">
-                    Using Leaflet Routing Machine + OSRM for accuracy
+                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                <p>Searching for fuel stations...</p>
+            </div>
+        `;
+
+        try {
+            // Clear previous markers
+            clearMap();
+
+            // Set map view to search location and zoom in
+            map.setView([lat, lng], 14);
+
+            // Add search marker
+            const searchMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    html: `
+    <div style="width: 32px; height: 32px;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="#3b82f6" viewBox="0 0 24 24">
+        <path fill-rule="evenodd" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 6 13 6 13s6-8.03 6-13c0-3.314-2.686-6-6-6zm0 8a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+        </svg>
+    </div>
+    `,
+                    className: 'custom-marker',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32],
+                })
+            }).addTo(map);
+
+            // Add radius circle
+            radiusCircle = L.circle([lat, lng], {
+                color: '#10b981',
+                fillColor: '#34d399',
+                fillOpacity: 0.1,
+                weight: 2,
+                radius: radius * 1000
+            }).addTo(map);
+
+            // Fetch stations
+            const stations = await stationFetcher.fetchFuelStations(lat, lng, radius);
+            
+            // Show initial results
+            displayStationResults(stations);
+            
+            // Update loading message
+            document.getElementById('results-list').innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-route fa-spin text-2xl mb-2"></i>
+                    <p>Calculating precise road distances...</p>
+                    <div class="text-sm text-gray-400 mt-2">
+                        Using Leaflet Routing Machine + OSRM for accuracy
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        // Calculate accurate distances with Leaflet Routing Machine
-        await fetchDistancesWithLRM(lat, lng, stations);
-        
-        // Re-display with accurate distances
-        displayStationResults(stations);
-        updateStatistics(stations);
+            // Calculate accurate distances with Leaflet Routing Machine
+            await fetchDistancesWithLRM(lat, lng, stations);
+            
+            // Re-display with accurate distances
+            displayStationResults(stations);
+            updateStatistics(stations);
 
-    } catch (error) {
-        document.getElementById('results-list').innerHTML = `
-            <div class="error">
-                <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
-                <p>Error searching for stations</p>
-            </div>
-        `;
-    } finally {
-        searchBtn.disabled = false;
-        searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search Stations';
+        } catch (error) {
+            document.getElementById('results-list').innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                    <p>Error searching for stations</p>
+                </div>
+            `;
+        } finally {
+            searchBtn.disabled = false;
+            searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search Stations';
+        }
     }
-}
 
 // Display station results
 function displayStationResults(stations) {
