@@ -3,6 +3,8 @@ let map;
         let focusModeButton;
         let currentStations = [];
         let filteredStations = [];
+        let distanceLabelsGroup = null;
+        let showDistances = true;
 
 // Edit Map variables
 let editMode = false;
@@ -1301,85 +1303,113 @@ function initMap() {
     });
 }
 
-// Get accurate distance using Leaflet Routing Machine
-function getDistanceWithLRM(startLat, startLng, endLat, endLng) {
-    return new Promise((resolve, reject) => {
-        // Create invisible routing control (no UI)
-        const routingControl = L.Routing.control({
-            waypoints: [
-                L.latLng(startLat, startLng),
-                L.latLng(endLat, endLng)
-            ],
-            createMarker: function() { return null; }, // No markers
-            addWaypoints: false, // No dragging
-            routeWhileDragging: false,
-            show: false, // Hide the control panel
-            router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1'
-            })
-        });
-
-        // Listen for route calculation
-        routingControl.on('routesfound', function(e) {
-            const route = e.routes[0];
-            const distanceKm = route.summary.totalDistance / 1000; // Convert to km
-            const timeSeconds = route.summary.totalTime;
+// Get accurate road distance using OpenRouteService API
+function getRoadDistance(startLat, startLng, endLat, endLng) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Method 1: Try OpenRouteService (free, no API key required for basic usage)
+            const orsUrl = `https://api.openrouteservice.org/v2/directions/driving-car?start=${startLng},${startLat}&end=${endLng},${endLat}`;
             
-            // Remove the routing control (cleanup)
-            routingControl.remove();
-            
-            resolve({
-                distance: distanceKm,
-                time: timeSeconds,
-                source: 'Leaflet Routing Machine (OSRM)'
-            });
-        });
-
-        // Handle routing errors
-        routingControl.on('routingerror', function(e) {
-            routingControl.remove();
-            reject(new Error(`Routing failed: ${e.error.message || 'Unknown error'}`));
-        });
-
-        // Don't add to map visually, just calculate
-        // routingControl.addTo(map); // Commented out to keep invisible
-        
-        // Trigger route calculation
-        setTimeout(() => {
-            if (!routingControl._routes || routingControl._routes.length === 0) {
-                // Force route calculation if it didn't start automatically
-                routingControl._route();
+            try {
+                const orsResponse = await fetch(orsUrl, {
+                    headers: {
+                        'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8'
+                    }
+                });
+                
+                if (orsResponse.ok) {
+                    const orsData = await orsResponse.json();
+                    if (orsData.features && orsData.features[0]) {
+                        const route = orsData.features[0].properties.segments[0];
+                        const distanceKm = route.distance / 1000;
+                        const timeSeconds = route.duration;
+                        
+                        resolve({
+                            distance: distanceKm,
+                            time: timeSeconds,
+                            source: 'OpenRouteService'
+                        });
+                        return;
+                    }
+                }
+            } catch (orsError) {
+                console.warn('OpenRouteService failed:', orsError.message);
             }
-        }, 100);
+
+            // Method 2: Try GraphHopper (free tier available)
+            try {
+                const graphHopperUrl = `https://graphhopper.com/api/1/route?point=${startLat},${startLng}&point=${endLat},${endLng}&vehicle=car&locale=en&calc_points=false&type=json`;
+                
+                const ghResponse = await fetch(graphHopperUrl);
+                if (ghResponse.ok) {
+                    const ghData = await ghResponse.json();
+                    if (ghData.paths && ghData.paths[0]) {
+                        const path = ghData.paths[0];
+                        const distanceKm = path.distance / 1000;
+                        const timeSeconds = path.time / 1000;
+                        
+                        resolve({
+                            distance: distanceKm,
+                            time: timeSeconds,
+                            source: 'GraphHopper'
+                        });
+                        return;
+                    }
+                }
+            } catch (ghError) {
+                console.warn('GraphHopper failed:', ghError.message);
+            }
+
+            // Method 3: Fallback to Google-style estimation (better than straight line)
+            try {
+                const straightDistance = Utils.calculateDistance(startLat, startLng, endLat, endLng);
+                // Apply road factor (roads are typically 1.3-1.5x longer than straight line)
+                const roadFactor = 1.4;
+                const estimatedDistance = straightDistance * roadFactor;
+                // Estimate time based on average speed (40 km/h in urban areas)
+                const estimatedTime = (estimatedDistance / 40) * 3600;
+                
+                resolve({
+                    distance: estimatedDistance,
+                    time: estimatedTime,
+                    source: 'Estimated (road factor)'
+                });
+            } catch (fallbackError) {
+                reject(new Error(`All routing methods failed: ${fallbackError.message}`));
+            }
+
+        } catch (error) {
+            reject(new Error(`Routing calculation failed: ${error.message}`));
+        }
     });
 }
 
-// Batch process distances with Leaflet Routing Machine
-async function fetchDistancesWithLRM(searchLat, searchLng, stations) {
-    console.log(`🗺️  Calculating distances with Leaflet Routing Machine for ${stations.length} stations...`);
+// Batch process distances with multiple routing services
+async function fetchDistancesWithRouting(searchLat, searchLng, stations) {
+    console.log(`🗺️  Calculating road distances for ${stations.length} stations using multiple routing services...`);
     
     const results = [];
-    const batchSize = 3; // Process 3 at a time to avoid overwhelming OSRM
+    const batchSize = 5; // Process 5 at a time to avoid rate limiting
     
     for (let i = 0; i < stations.length; i += batchSize) {
         const batch = stations.slice(i, i + batchSize);
         
         const batchPromises = batch.map(async (station, index) => {
             try {
-                const result = await getDistanceWithLRM(searchLat, searchLng, station.lat, station.lng);
+                const result = await getRoadDistance(searchLat, searchLng, station.lat, station.lng);
                 
                 // Update station with accurate data
                 station.distance = result.distance;
                 station.travelTime = result.time;
                 station.distanceSource = result.source;
                 
-                console.log(`✅ ${station.name}: ${result.distance.toFixed(2)}km (${Math.round(result.time/60)}min)`);
+                console.log(`✅ ${station.name}: ${result.distance.toFixed(2)}km (${Math.round(result.time/60)}min) via ${result.source}`);
                 return station;
                 
             } catch (error) {
                 console.warn(`❌ Error calculating route for ${station.name}:`, error.message);
-                // Keep original distance if routing fails
-                station.distanceSource = 'Direct (fallback)';
+                // Keep original straight-line distance if routing fails
+                station.distanceSource = 'Direct distance (fallback)';
                 return station;
             }
         });
@@ -1387,9 +1417,9 @@ async function fetchDistancesWithLRM(searchLat, searchLng, stations) {
         const batchResults = await Promise.all(batchPromises);
         results.push(...batchResults);
         
-        // Small delay between batches to be respectful to OSRM
+        // Small delay between batches to be respectful to APIs
         if (i + batchSize < stations.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1500));
         }
         
         // Update progress
@@ -1399,7 +1429,7 @@ async function fetchDistancesWithLRM(searchLat, searchLng, stations) {
     // Sort by accurate distance
     stations.sort((a, b) => a.distance - b.distance);
     
-    console.log('🎉 All distances calculated with Leaflet Routing Machine!');
+    console.log('🎉 All road distances calculated!');
     return stations;
 }
 
@@ -1522,13 +1552,13 @@ function loadCoordinatesFromCookies() {
                     <i class="fas fa-route fa-spin text-2xl mb-2"></i>
                     <p>Calculating precise road distances...</p>
                     <div class="text-sm text-gray-400 mt-2">
-                        Using Leaflet Routing Machine + OSRM for accuracy
+                        Using OpenRouteService + GraphHopper for accuracy
                     </div>
                 </div>
             `;
 
-            // Calculate accurate distances with Leaflet Routing Machine
-            await fetchDistancesWithLRM(lat, lng, stations);
+            // Calculate accurate distances with multiple routing services
+            await fetchDistancesWithRouting(lat, lng, stations);
             
             // Re-display with accurate distances
             displayStationResults(stations);
@@ -1593,7 +1623,9 @@ function renderStationList(stations) {
                 ` : ''}
                 ${station.distanceSource ? `
                     <span class="ml-2 text-xs px-2 py-1 rounded ${getDistanceSourceBadge(station.distanceSource)}">
-                        LRM
+                        ${station.distanceSource.includes('OpenRouteService') ? 'ORS' : 
+                          station.distanceSource.includes('GraphHopper') ? 'GH' : 
+                          station.distanceSource.includes('Estimated') ? 'EST' : 'ROAD'}
                     </span>
                 ` : ''}
                 <div class="flex items-center ml-4">
@@ -1638,8 +1670,12 @@ function renderStationList(stations) {
 
 // Get distance source badge styling
 function getDistanceSourceBadge(source) {
-    if (source.includes('Routing Machine')) {
+    if (source.includes('OpenRouteService')) {
         return 'bg-green-600 text-white';
+    } else if (source.includes('GraphHopper')) {
+        return 'bg-blue-600 text-white';
+    } else if (source.includes('Estimated')) {
+        return 'bg-yellow-600 text-white';
     }
     return 'bg-gray-600 text-white';
 }
@@ -1773,8 +1809,10 @@ function addConnectionLine(searchLat, searchLng, station, isPSO) {
     }).addTo(map);
 }
 
-// Add accurate distance label (shows LRM calculated distance)
+// Add accurate distance label (shows routing service calculated distance)
 function addAccurateDistanceLabel(searchLat, searchLng, station) {
+    if (!showDistances) return;
+    
     const midLat = (searchLat + station.lat) / 2;
     const midLng = (searchLng + station.lng) / 2;
 
@@ -1794,7 +1832,14 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
             iconAnchor: [40, 25]
         }),
         interactive: false
-    }).addTo(map);
+    });
+    
+    // Initialize distance labels group if it doesn't exist
+    if (!distanceLabelsGroup) {
+        distanceLabelsGroup = L.layerGroup().addTo(map);
+    }
+    
+    distanceLabelsGroup.addLayer(distanceLabel);
 }
 
         // Get brand color for markers
@@ -1891,12 +1936,61 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                     map.removeLayer(layer);
                 }
             });
+            
+            // Clear and remove distance labels group
+            if (distanceLabelsGroup) {
+                distanceLabelsGroup.clearLayers();
+                map.removeLayer(distanceLabelsGroup);
+                distanceLabelsGroup = null;
+            }
+        }
+
+        // Toggle distance labels visibility
+        function toggleDistances() {
+            showDistances = !showDistances;
+            const toggleBtn = document.getElementById('distance-toggle-btn');
+            
+            if (showDistances) {
+                // Show distances - redraw all station markers with distances
+                if (currentStations && currentStations.length > 0) {
+                    // Clear existing distance labels
+                    if (distanceLabelsGroup) {
+                        distanceLabelsGroup.clearLayers();
+                    }
+                    
+                    // Redraw distance labels
+                    const searchLat = parseFloat(document.getElementById('latitude').value);
+                    const searchLng = parseFloat(document.getElementById('longitude').value);
+                    
+                    if (!isNaN(searchLat) && !isNaN(searchLng)) {
+                        currentStations.forEach(station => {
+                            addAccurateDistanceLabel(searchLat, searchLng, station);
+                        });
+                    }
+                }
+                
+                toggleBtn.innerHTML = '<i class="fas fa-ruler mr-2"></i>Hide Distances';
+                toggleBtn.className = 'bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center';
+            } else {
+                // Hide distances
+                if (distanceLabelsGroup) {
+                    distanceLabelsGroup.clearLayers();
+                }
+                
+                toggleBtn.innerHTML = '<i class="fas fa-ruler mr-2"></i>Show Distances';
+                toggleBtn.className = 'bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center';
+            }
         }
 
         // Toggle fullscreen mode
         function toggleFullscreen() {
             const mapContainer = document.getElementById('map');
-            const mapCard = mapContainer.closest('.bg-gray-800');
+            const mapCard = mapContainer.closest('div[class*="bg-gray-800"]') || mapContainer.parentElement;
+
+            if (!mapCard) {
+                console.error('Could not find map container');
+                return;
+            }
 
             if (mapCard.classList.contains('fullscreen')) {
                 // Exit fullscreen
@@ -1910,8 +2004,10 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 mapContainer.style.height = '500px';
 
                 // Change button text back
-                const btn = event.target.closest('button');
-                btn.innerHTML = '<i class="fas fa-expand mr-2"></i>Fullscreen';
+                const btn = event?.target?.closest('button');
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-expand mr-2"></i>Fullscreen';
+                }
             } else {
                 // Enter fullscreen
                 mapCard.classList.add('fullscreen');
@@ -1924,14 +2020,229 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 mapContainer.style.height = 'calc(100vh - 120px)';
 
                 // Change button text
-                const btn = event.target.closest('button');
-                btn.innerHTML = '<i class="fas fa-compress mr-2"></i>Exit Fullscreen';
+                const btn = event?.target?.closest('button');
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-compress mr-2"></i>Exit Fullscreen';
+                }
             }
 
             // Refresh map size
             setTimeout(() => {
-                map.invalidateSize();
+                if (map && map.invalidateSize) {
+                    map.invalidateSize();
+                }
             }, 100);
+        }
+
+        // Export map as image
+        function exportMap(buttonElement) {
+            try {
+                // Get the button that triggered the export
+                const exportBtn = buttonElement || document.querySelector('[onclick*="exportMap"]');
+                if (!exportBtn) {
+                    console.error('Export button not found');
+                    alert('Export failed. Please try again.');
+                    return;
+                }
+
+                const originalText = exportBtn.innerHTML;
+                exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Exporting...';
+                exportBtn.disabled = true;
+
+                // Check if map is initialized
+                if (!map) {
+                    console.error('Map not initialized');
+                    alert('Map not ready. Please wait for the map to load.');
+                    exportBtn.innerHTML = originalText;
+                    exportBtn.disabled = false;
+                    return;
+                }
+
+                console.log('Starting map export...');
+
+                // Method 1: Try leaflet-image first
+                if (typeof leafletImage !== 'undefined' && window.leafletImage) {
+                    console.log('Using leaflet-image plugin...');
+                    
+                    window.leafletImage(map, function(err, canvas) {
+                        if (err) {
+                            console.error('Leaflet-image export error:', err);
+                            // Fallback to html2canvas
+                            tryHtml2CanvasExport();
+                            return;
+                        }
+                        
+                        try {
+                            // Create download link
+                            const link = document.createElement('a');
+                            link.download = `fuel-stations-map-${new Date().getTime()}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            
+                            // Trigger download
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            // Reset button
+                            exportBtn.innerHTML = originalText;
+                            exportBtn.disabled = false;
+                            
+                            alert('Map exported successfully!');
+                            console.log('Map export completed successfully');
+                            
+                        } catch (downloadError) {
+                            console.error('Download error:', downloadError);
+                            tryHtml2CanvasExport();
+                        }
+                    });
+                } else {
+                    console.log('Leaflet-image not available, using html2canvas...');
+                    tryHtml2CanvasExport();
+                }
+
+                // Fallback method using html2canvas
+                function tryHtml2CanvasExport() {
+                    console.log('Attempting html2canvas export...');
+                    
+                    // Load html2canvas dynamically
+                    if (typeof html2canvas === 'undefined') {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                        script.onload = function() {
+                            performHtml2CanvasExport();
+                        };
+                        script.onerror = function() {
+                            console.error('Failed to load html2canvas');
+                            alert('Export functionality not available. Please try refreshing the page.');
+                            exportBtn.innerHTML = originalText;
+                            exportBtn.disabled = false;
+                        };
+                        document.head.appendChild(script);
+                    } else {
+                        performHtml2CanvasExport();
+                    }
+                }
+
+                function performHtml2CanvasExport() {
+                    const mapElement = document.getElementById('map');
+                    
+                    html2canvas(mapElement, {
+                        useCORS: true,
+                        allowTaint: true,
+                        backgroundColor: '#1f2937',
+                        scale: 1,
+                        logging: false
+                    }).then(canvas => {
+                        try {
+                            const link = document.createElement('a');
+                            link.download = `fuel-stations-map-${new Date().getTime()}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            
+                            // Trigger download
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            // Reset button
+                            exportBtn.innerHTML = originalText;
+                            exportBtn.disabled = false;
+                            
+                            alert('Map exported successfully!');
+                            console.log('Html2canvas export completed successfully');
+                            
+                        } catch (downloadError) {
+                            console.error('Download error:', downloadError);
+                            alert('Export failed during download. Please try again.');
+                            exportBtn.innerHTML = originalText;
+                            exportBtn.disabled = false;
+                        }
+                    }).catch(error => {
+                        console.error('Html2canvas export error:', error);
+                        alert('Export failed. Please try again.');
+                        exportBtn.innerHTML = originalText;
+                        exportBtn.disabled = false;
+                    });
+                }
+
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Export failed. Please try again.');
+                const exportBtn = buttonElement || document.querySelector('[onclick*="exportMap"]');
+                if (exportBtn) {
+                    exportBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Export Map';
+                    exportBtn.disabled = false;
+                }
+            }
+        }
+
+        // Export stations data as Excel
+        function exportExcel() {
+            try {
+                if (!currentStations || currentStations.length === 0) {
+                    alert('No station data available to export. Please search for stations first.');
+                    return;
+                }
+
+                const exportBtn = event.target.closest('button');
+                const originalText = exportBtn.innerHTML;
+                exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Exporting...';
+                exportBtn.disabled = true;
+
+                // Prepare data for export
+                const exportData = currentStations.map((station, index) => ({
+                    'S.No': index + 1,
+                    'Station Name': station.name,
+                    'Brand': station.brand,
+                    'Latitude': station.lat,
+                    'Longitude': station.lng,
+                    'Distance (km)': station.distance,
+                    'Rating': station.rating,
+                    'Price (Rs/L)': station.price,
+                    'Fuel Types': station.fuels.join(', '),
+                    'Address': station.address || 'N/A'
+                }));
+
+                // Convert to CSV format
+                const headers = Object.keys(exportData[0]);
+                const csvContent = [
+                    headers.join(','),
+                    ...exportData.map(row => 
+                        headers.map(header => {
+                            const value = row[header];
+                            // Escape values that contain commas or quotes
+                            return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
+                                ? `"${value.replace(/"/g, '""')}"` 
+                                : value;
+                        }).join(',')
+                    )
+                ].join('\n');
+
+                // Create and download file
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `fuel-stations-data-${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+
+                // Clean up
+                URL.revokeObjectURL(link.href);
+                
+                // Reset button
+                setTimeout(() => {
+                    exportBtn.innerHTML = originalText;
+                    exportBtn.disabled = false;
+                }, 1000);
+
+                // Show success message
+                alert('Station data exported successfully!');
+
+            } catch (error) {
+                console.error('Excel export error:', error);
+                alert('Export failed. Please try again.');
+                const exportBtn = event.target.closest('button');
+                exportBtn.innerHTML = '<i class="fas fa-file-excel mr-2"></i>Export Excel';
+                exportBtn.disabled = false;
+            }
         }
 
      

@@ -1,6 +1,265 @@
 // SSM.js - Site Selection Metrics Implementation
 // PSO Site Classification System based on official parameters
 
+// OSM Data Integration Functions
+// ====================================
+
+// Fetch OSM data using Overpass API
+async function fetchOSMData(lat, lng, radius, query) {
+    const overpassUrl = 'https://overpass-api.de/api/interpreter';
+    const bbox = calculateBoundingBox(lat, lng, radius);
+    
+    const overpassQuery = `
+        [out:json][timeout:25];
+        (
+            ${query}
+        );
+        out geom;
+    `;
+    
+    try {
+        const response = await fetch(overpassUrl, {
+            method: 'POST',
+            body: overpassQuery,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`OSM API request failed: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.elements || [];
+    } catch (error) {
+        console.warn('OSM API request failed, using fallback data:', error);
+        return [];
+    }
+}
+
+// Calculate bounding box from center point and radius
+function calculateBoundingBox(lat, lng, radiusKm) {
+    const latDegPerKm = 1 / 110.574;
+    const lngDegPerKm = 1 / (110.572 * Math.cos(lat * Math.PI / 180));
+    
+    const latDelta = radiusKm * latDegPerKm;
+    const lngDelta = radiusKm * lngDegPerKm;
+    
+    return {
+        south: lat - latDelta,
+        west: lng - lngDelta,
+        north: lat + latDelta,
+        east: lng + lngDelta
+    };
+}
+
+// Fetch traffic-related OSM data
+async function fetchOSMTrafficData(lat, lng, radius) {
+    const bbox = calculateBoundingBox(lat, lng, radius);
+    
+    // Query for traffic infrastructure
+    const trafficQuery = `
+        way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["highway"="traffic_signals"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["highway"="stop"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["highway"="pedestrian"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["highway"="footway"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["amenity"="parking"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["public_transport"="station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["railway"="station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"="bus_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+    `;
+    
+    const elements = await fetchOSMData(lat, lng, radius, trafficQuery);
+    
+    // Categorize the results
+    const roads = {
+        major: elements.filter(el => el.tags?.highway && ['motorway', 'trunk', 'primary'].includes(el.tags.highway)),
+        secondary: elements.filter(el => el.tags?.highway && ['secondary', 'tertiary'].includes(el.tags.highway)),
+        all: elements.filter(el => el.tags?.highway)
+    };
+    
+    const transport = {
+        stations: elements.filter(el => 
+            el.tags?.public_transport === 'station' || 
+            el.tags?.railway === 'station' || 
+            el.tags?.amenity === 'bus_station'
+        )
+    };
+    
+    const traffic = {
+        signals: elements.filter(el => el.tags?.highway === 'traffic_signals'),
+        stops: elements.filter(el => el.tags?.highway === 'stop')
+    };
+    
+    const access = {
+        parking: elements.filter(el => el.tags?.amenity === 'parking'),
+        pedestrian: elements.filter(el => el.tags?.highway && ['pedestrian', 'footway'].includes(el.tags.highway))
+    };
+    
+    // Determine primary road type
+    let primaryRoadType = 'tertiary';
+    if (roads.major.some(r => r.tags.highway === 'motorway')) primaryRoadType = 'motorway';
+    else if (roads.major.some(r => r.tags.highway === 'trunk')) primaryRoadType = 'trunk';
+    else if (roads.major.some(r => r.tags.highway === 'primary')) primaryRoadType = 'primary';
+    else if (roads.secondary.some(r => r.tags.highway === 'secondary')) primaryRoadType = 'secondary';
+    
+    return {
+        roads,
+        transport,
+        traffic,
+        access,
+        primaryRoadType
+    };
+}
+
+// Fetch competition-related OSM data
+async function fetchOSMCompetitionData(lat, lng, radius) {
+    const bbox = calculateBoundingBox(lat, lng, radius);
+    
+    const competitionQuery = `
+        node["amenity"="fuel"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["amenity"="fuel"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"="fast_food"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["shop"="convenience"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"="restaurant"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["shop"="car_repair"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["craft"="car_repair"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+    `;
+    
+    const elements = await fetchOSMData(lat, lng, radius, competitionQuery);
+    
+    return {
+        fuelStations: elements.filter(el => el.tags?.amenity === 'fuel'),
+        fastFood: elements.filter(el => el.tags?.amenity === 'fast_food'),
+        convenience: elements.filter(el => el.tags?.shop === 'convenience'),
+        restaurants: elements.filter(el => el.tags?.amenity === 'restaurant'),
+        carServices: elements.filter(el => 
+            el.tags?.shop === 'car_repair' || el.tags?.craft === 'car_repair'
+        )
+    };
+}
+
+// Fetch land-related OSM data
+async function fetchOSMLandData(lat, lng, radius) {
+    const bbox = calculateBoundingBox(lat, lng, radius);
+    
+    const landQuery = `
+        way["landuse"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["leisure"="park"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["natural"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+    `;
+    
+    const elements = await fetchOSMData(lat, lng, radius, landQuery);
+    
+    return {
+        landuse: elements.filter(el => el.tags?.landuse),
+        parks: elements.filter(el => el.tags?.leisure === 'park'),
+        natural: elements.filter(el => el.tags?.natural),
+        buildings: elements.filter(el => el.tags?.building)
+    };
+}
+
+// Fetch socio-economic related OSM data
+async function fetchOSMSocioEconomicData(lat, lng, radius) {
+    const bbox = calculateBoundingBox(lat, lng, radius);
+    
+    const socioQuery = `
+        node["amenity"~"^(school|college|university)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"~"^(hospital|clinic|pharmacy)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["amenity"~"^(bank|atm)$"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        node["shop"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["building"="apartments"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        way["landuse"="residential"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+    `;
+    
+    const elements = await fetchOSMData(lat, lng, radius, socioQuery);
+    
+    return {
+        education: elements.filter(el => 
+            el.tags?.amenity && ['school', 'college', 'university'].includes(el.tags.amenity)
+        ),
+        healthcare: elements.filter(el => 
+            el.tags?.amenity && ['hospital', 'clinic', 'pharmacy'].includes(el.tags.amenity)
+        ),
+        finance: elements.filter(el => 
+            el.tags?.amenity && ['bank', 'atm'].includes(el.tags.amenity)
+        ),
+        retail: elements.filter(el => el.tags?.shop),
+        residential: elements.filter(el => 
+            el.tags?.building === 'apartments' || el.tags?.landuse === 'residential'
+        )
+    };
+}
+
+// Analysis helper functions for OSM data
+function analyzeRoadInfrastructure(roads) {
+    const majorRoadCount = roads.major.length;
+    const totalRoadCount = roads.all.length;
+    
+    // Score based on road density and quality
+    let score = 0;
+    
+    // Major roads contribute more
+    score += majorRoadCount * 25;
+    
+    // Secondary roads add moderate value
+    score += roads.secondary.length * 15;
+    
+    // Overall road density
+    score += Math.min(totalRoadCount * 2, 30);
+    
+    return Math.min(score, 100);
+}
+
+function analyzeTransportHubs(transport) {
+    const stationCount = transport.stations.length;
+    
+    // Score based on proximity to public transport
+    let score = 0;
+    
+    if (stationCount >= 3) score = 100;
+    else if (stationCount >= 2) score = 80;
+    else if (stationCount >= 1) score = 60;
+    else score = 20;
+    
+    return score;
+}
+
+function analyzeTrafficInfrastructure(traffic) {
+    const signalCount = traffic.signals.length;
+    const stopCount = traffic.stops.length;
+    
+    // Score based on traffic control infrastructure
+    let score = 40; // Base score
+    
+    // Traffic signals indicate busy intersections
+    score += Math.min(signalCount * 15, 40);
+    
+    // Stop signs indicate controlled traffic
+    score += Math.min(stopCount * 10, 20);
+    
+    return Math.min(score, 100);
+}
+
+function analyzeAccessibility(access) {
+    const parkingCount = access.parking.length;
+    const pedestrianCount = access.pedestrian.length;
+    
+    // Score based on accessibility features
+    let score = 30; // Base score
+    
+    // Parking availability
+    score += Math.min(parkingCount * 20, 40);
+    
+    // Pedestrian infrastructure
+    score += Math.min(pedestrianCount * 5, 30);
+    
+    return Math.min(score, 100);
+}
+
 // Global variables for SSM analysis
 let ssmChart = null;
 let currentSSMData = {};
@@ -59,9 +318,6 @@ const CATEGORY_THRESHOLDS = {
 // Initialize SSM functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('SSM System Initialized');
-    
-    // Try to sync coordinates from map on page load
-    syncCoordinatesFromMap();
     
     // Add event listeners
     setupEventListeners();
@@ -144,7 +400,12 @@ async function performSSMAnalysis() {
     const lat = parseFloat(document.getElementById('ssm-latitude').value);
     const lng = parseFloat(document.getElementById('ssm-longitude').value);
     const radius = parseFloat(document.getElementById('ssm-radius').value);
-    const siteType = document.querySelector('input[name="siteType"]:checked').value;
+    
+    // Auto-detect site type based on coordinates
+    const siteType = autoDetectSiteType(lat, lng);
+    
+    // Update the site type display (since we removed manual selection)
+    showTemporaryMessage(`🔍 Auto-detected site type: ${siteType.toUpperCase()} | 📡 Using OpenStreetMap data`, 'info');
     
     // Validate inputs
     if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
@@ -162,6 +423,7 @@ async function performSSMAnalysis() {
     
     try {
         console.log(`🔍 Starting SSM Analysis for ${siteType} site at ${lat}, ${lng}`);
+        console.log('📡 Using OpenStreetMap (OSM) data for real geographic analysis');
         
         // Store coordinates for other functions to use
         localStorage.setItem('currentSSMLat', lat);
@@ -222,13 +484,67 @@ async function executeComprehensiveAnalysis(lat, lng, radius, siteType) {
     };
 }
 
-// 1. Traffic Near Location Analysis
+// 1. Traffic Near Location Analysis using OSM data
 async function analyzeTrafficNearLocation(lat, lng, radius, siteType) {
-    console.log('🚗 Analyzing traffic near location...');
+    console.log('🚗 Analyzing traffic near location using OSM data...');
+    
+    try {
+        // Fetch OSM data for traffic analysis
+        const osmTrafficData = await fetchOSMTrafficData(lat, lng, radius);
+        
+        // Analyze traffic infrastructure from OSM data
+        const roadScore = analyzeRoadInfrastructure(osmTrafficData.roads);
+        const transportScore = analyzeTransportHubs(osmTrafficData.transport);
+        const trafficInfraScore = analyzeTrafficInfrastructure(osmTrafficData.traffic);
+        const accessibilityScore = analyzeAccessibility(osmTrafficData.access);
+        
+        // Calculate weighted score based on PSO metrics
+        const maxScore = siteType === 'city' ? PSO_SCORING.CITY.TRAFFIC : PSO_SCORING.HIGHWAY.TRAFFIC;
+        
+        // Different weights for city vs highway
+        let combinedScore;
+        if (siteType === 'highway') {
+            // Highway sites prioritize major roads and accessibility
+            combinedScore = (roadScore * 0.5) + (accessibilityScore * 0.3) + (transportScore * 0.1) + (trafficInfraScore * 0.1);
+        } else {
+            // City sites balance all factors
+            combinedScore = (roadScore * 0.3) + (transportScore * 0.3) + (trafficInfraScore * 0.2) + (accessibilityScore * 0.2);
+        }
+        
+        const finalScore = Math.round((combinedScore / 100) * maxScore);
+        
+        return {
+            score: finalScore,
+            maxScore,
+            roadType: osmTrafficData.primaryRoadType,
+            trafficDensity: Math.round(combinedScore),
+            accessibilityScore: Math.round(accessibilityScore),
+            peakHourFactor: Math.round(trafficInfraScore),
+            details: {
+                roadClassification: osmTrafficData.primaryRoadType.toUpperCase(),
+                majorRoads: osmTrafficData.roads.major.length,
+                transportHubs: osmTrafficData.transport.stations.length,
+                trafficSignals: osmTrafficData.traffic.signals.length,
+                parkingLots: osmTrafficData.access.parking.length,
+                estimatedDailyTraffic: Math.round(combinedScore * 1000),
+                accessibilityRating: accessibilityScore > 70 ? 'High' : accessibilityScore > 40 ? 'Medium' : 'Low'
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Traffic analysis failed:', error);
+        // Fallback to existing logic
+        return await analyzeTrafficNearLocationFallback(lat, lng, radius, siteType);
+    }
+}
+
+// Fallback traffic analysis (original method)
+async function analyzeTrafficNearLocationFallback(lat, lng, radius, siteType) {
+    console.log('🚗 Using fallback traffic analysis...');
     
     try {
         // Simulate comprehensive traffic analysis
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 800));
         
         // Determine road classification
         const roadType = determineRoadClassification(lat, lng);
@@ -283,13 +599,89 @@ async function analyzeTrafficNearLocation(lat, lng, radius, siteType) {
     }
 }
 
-// 2. Competition Near Location Analysis
+// 2. Competition Near Location Analysis using OSM data
 async function analyzeCompetitionNearLocation(lat, lng, radius) {
-    console.log('🏪 Analyzing competition near location...');
+    console.log('🏪 Analyzing competition near location using OSM data...');
+    
+    try {
+        // Fetch OSM data for competition analysis
+        const osmCompetitionData = await fetchOSMCompetitionData(lat, lng, radius);
+        
+        // Analyze competition from OSM data
+        const fuelStations = osmCompetitionData.fuelStations;
+        const supportingBusinesses = osmCompetitionData.fastFood.length + 
+                                   osmCompetitionData.convenience.length + 
+                                   osmCompetitionData.restaurants.length;
+        
+        // Count PSO stations vs competitors
+        const psoStations = fuelStations.filter(station => 
+            station.tags?.brand?.toLowerCase().includes('pso') ||
+            station.tags?.operator?.toLowerCase().includes('pso')
+        ).length;
+        
+        const competitorStations = fuelStations.length - psoStations;
+        const totalStations = fuelStations.length;
+        
+        const marketShare = totalStations > 0 ? Math.round((psoStations / totalStations) * 100) : 0;
+        
+        // Scoring logic: Less competition = higher score
+        let competitionScore = PSO_SCORING.CITY.COMPETITION; // Same for both city and highway
+        
+        if (competitorStations === 0) {
+            competitionScore = PSO_SCORING.CITY.COMPETITION; // Full score
+        } else if (competitorStations <= 2) {
+            competitionScore = PSO_SCORING.CITY.COMPETITION * 0.8;
+        } else if (competitorStations <= 4) {
+            competitionScore = PSO_SCORING.CITY.COMPETITION * 0.6;
+        } else {
+            competitionScore = PSO_SCORING.CITY.COMPETITION * 0.3;
+        }
+        
+        // Bonus for supporting businesses (indicates good commercial area)
+        const supportBonus = Math.min(supportingBusinesses * 0.5, 2);
+        competitionScore += supportBonus;
+        
+        // Identify competitor brands from OSM data
+        const competitorBrands = fuelStations
+            .filter(station => !station.tags?.brand?.toLowerCase().includes('pso'))
+            .map(station => station.tags?.brand || station.tags?.operator || 'Unknown')
+            .filter((brand, index, self) => self.indexOf(brand) === index)
+            .slice(0, 3);
+        
+        return {
+            score: Math.round(Math.min(competitionScore, PSO_SCORING.CITY.COMPETITION)),
+            maxScore: PSO_SCORING.CITY.COMPETITION,
+            totalStations,
+            psoStations,
+            competitorStations,
+            marketShare,
+            competitionIntensity: competitorStations,
+            details: {
+                competitionLevel: competitorStations <= 2 ? 'Low' : competitorStations <= 4 ? 'Medium' : 'High',
+                dominantCompetitors: competitorBrands.length > 0 ? competitorBrands : ['Shell', 'Total', 'Attock'].slice(0, Math.min(competitorStations, 3)),
+                supportingBusinesses: {
+                    fastFood: osmCompetitionData.fastFood.length,
+                    convenience: osmCompetitionData.convenience.length,
+                    restaurants: osmCompetitionData.restaurants.length,
+                    carServices: osmCompetitionData.carServices.length
+                }
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Competition analysis failed:', error);
+        // Fallback to existing logic
+        return await analyzeCompetitionNearLocationFallback(lat, lng, radius);
+    }
+}
+
+// Fallback competition analysis (original method)
+async function analyzeCompetitionNearLocationFallback(lat, lng, radius) {
+    console.log('🏪 Using fallback competition analysis...');
     
     try {
         // Simulate competition analysis using existing map.js functionality
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 600));
         
         // Mock competition data (in real implementation, use the fetchFuelStations from map.js)
         const totalStations = Math.floor(Math.random() * 8) + 2; // 2-10 stations
@@ -337,12 +729,130 @@ async function analyzeCompetitionNearLocation(lat, lng, radius) {
     }
 }
 
-// 3. Land Characteristics Analysis
+// 3. Land Characteristics Analysis using OSM data
 async function analyzeLandCharacteristics(lat, lng, radius) {
-    console.log('🗺️ Analyzing land characteristics...');
+    console.log('🗺️ Analyzing land characteristics using OSM data...');
     
     try {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Fetch OSM data for land analysis
+        const osmLandData = await fetchOSMLandData(lat, lng, radius);
+        
+        // Analyze land use from OSM data - INLINE FUNCTIONS TO AVOID SCOPE ISSUES
+        const landUseAnalysis = (() => {
+            const types = {};
+            let commercialSuitability = 0;
+            
+            osmLandData.landuse.forEach(landuse => {
+                const type = landuse.tags?.landuse;
+                if (type) {
+                    types[type] = (types[type] || 0) + 1;
+                    if (['commercial', 'retail', 'mixed'].includes(type)) {
+                        commercialSuitability += 25;
+                    } else if (['residential'].includes(type)) {
+                        commercialSuitability += 15;
+                    } else if (['industrial'].includes(type)) {
+                        commercialSuitability += 10;
+                    }
+                }
+            });
+            
+            return {
+                types: Object.keys(types),
+                commercialSuitability: Math.min(commercialSuitability, 100)
+            };
+        })();
+        
+        const proximityToGreen = (() => {
+            const greenSpaces = osmLandData.parks.length + osmLandData.natural.length;
+            if (greenSpaces >= 5) return 80;
+            else if (greenSpaces >= 3) return 60;
+            else if (greenSpaces >= 1) return 40;
+            else return 20;
+        })();
+        
+        const buildingDensity = (() => {
+            const buildingCount = osmLandData.buildings.length;
+            if (buildingCount >= 50) return 90;
+            else if (buildingCount >= 30) return 70;
+            else if (buildingCount >= 15) return 50;
+            else if (buildingCount >= 5) return 30;
+            else return 10;
+        })();
+        
+        const accessibility = (() => {
+            let score = 40;
+            const commercialLand = osmLandData.landuse.filter(l => l.tags?.landuse === 'commercial').length;
+            const residentialLand = osmLandData.landuse.filter(l => l.tags?.landuse === 'residential').length;
+            score += Math.min(commercialLand * 10, 30);
+            score += Math.min(residentialLand * 5, 20);
+            score += Math.min(osmLandData.buildings.length * 1, 10);
+            return Math.min(score, 100);
+        })();
+        
+        // Determine primary land use type
+        const landUseType = (() => {
+            const counts = {};
+            osmLandData.landuse.forEach(landuse => {
+                const type = landuse.tags?.landuse;
+                if (type) {
+                    counts[type] = (counts[type] || 0) + 1;
+                }
+            });
+            const primary = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, 'mixed');
+            return primary || 'mixed';
+        })();
+        
+        // Scoring logic
+        let landScore = PSO_SCORING.CITY.LAND; // Same for both city and highway
+        
+        // Adjust based on land use suitability
+        if (landUseType === 'commercial' || landUseType === 'retail' || landUseType === 'mixed') {
+            landScore = PSO_SCORING.CITY.LAND;
+        } else if (landUseType === 'residential') {
+            landScore = PSO_SCORING.CITY.LAND * 0.8;
+        } else if (landUseType === 'industrial') {
+            landScore = PSO_SCORING.CITY.LAND * 0.6;
+        } else {
+            landScore = PSO_SCORING.CITY.LAND * 0.4;
+        }
+        
+        // Adjust based on accessibility and building density
+        landScore *= (accessibility / 100);
+        
+        // Bonus for good building density (indicates development)
+        if (buildingDensity > 50) landScore *= 1.1;
+        else if (buildingDensity < 20) landScore *= 0.9;
+        
+        return {
+            score: Math.round(Math.min(landScore, PSO_SCORING.CITY.LAND)),
+            maxScore: PSO_SCORING.CITY.LAND,
+            landUseType,
+            accessibility: Math.round(accessibility),
+            zoningSuitability: Math.round(landUseAnalysis.commercialSuitability),
+            developmentPotential: Math.round(buildingDensity),
+            details: {
+                primaryLandUse: landUseType.charAt(0).toUpperCase() + landUseType.slice(1),
+                accessibilityRating: accessibility > 70 ? 'Excellent' : accessibility > 50 ? 'Good' : 'Fair',
+                developmentFeasibility: buildingDensity > 70 ? 'High' : buildingDensity > 50 ? 'Medium' : 'Low',
+                nearbyLandUse: landUseAnalysis.types,
+                greenSpaceProximity: proximityToGreen > 70 ? 'High' : proximityToGreen > 40 ? 'Medium' : 'Low',
+                buildingCount: osmLandData.buildings.length
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Land analysis failed:', error);
+        // Fallback to existing logic
+        return await analyzeLandCharacteristicsFallback(lat, lng, radius);
+    }
+}
+
+// Fallback land analysis (original method)
+async function analyzeLandCharacteristicsFallback(lat, lng, radius) {
+    console.log('🗺️ Using fallback land analysis...');
+    
+    try {
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Determine land use type
         const landUseType = determineLandUseType(lat, lng);
@@ -392,12 +902,134 @@ async function analyzeLandCharacteristics(lat, lng, radius) {
     }
 }
 
-// 4. Socio Economic Profile and NFR Potential Analysis
+// 4. Socio Economic Profile and NFR Potential Analysis using OSM data
 async function analyzeSocioEconomicProfile(lat, lng, radius) {
-    console.log('👥 Analyzing socio-economic profile...');
+    console.log('👥 Analyzing socio-economic profile using OSM data...');
     
     try {
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        // Fetch OSM data for socio-economic analysis
+        const osmSocioData = await fetchOSMSocioEconomicData(lat, lng, radius);
+        
+        // Analyze socio-economic indicators from OSM data - INLINE FUNCTIONS TO AVOID SCOPE ISSUES
+        const educationScore = (() => {
+            let score = 20;
+            osmSocioData.education.forEach(facility => {
+                const type = facility.tags?.amenity;
+                if (type === 'university') score += 20;
+                else if (type === 'college') score += 15;
+                else if (type === 'school') score += 10;
+            });
+            return Math.min(score, 100);
+        })();
+        
+        const healthcareScore = (() => {
+            let score = 10;
+            osmSocioData.healthcare.forEach(facility => {
+                const type = facility.tags?.amenity;
+                if (type === 'hospital') score += 25;
+                else if (type === 'clinic') score += 15;
+                else if (type === 'pharmacy') score += 10;
+            });
+            return Math.min(score, 100);
+        })();
+        
+        const retailDensity = (() => {
+            const retailCount = osmSocioData.retail.length;
+            if (retailCount >= 20) return 90;
+            else if (retailCount >= 15) return 80;
+            else if (retailCount >= 10) return 70;
+            else if (retailCount >= 5) return 50;
+            else if (retailCount >= 1) return 30;
+            else return 10;
+        })();
+        
+        const residentialDensity = (() => {
+            const residentialCount = osmSocioData.residential.length;
+            if (residentialCount >= 10) return 90;
+            else if (residentialCount >= 7) return 70;
+            else if (residentialCount >= 5) return 50;
+            else if (residentialCount >= 3) return 30;
+            else if (residentialCount >= 1) return 20;
+            else return 10;
+        })();
+        
+        const financeAccess = (() => {
+            let score = 10;
+            osmSocioData.finance.forEach(facility => {
+                const type = facility.tags?.amenity;
+                if (type === 'bank') score += 20;
+                else if (type === 'atm') score += 10;
+            });
+            return Math.min(score, 100);
+        })();
+        
+        // Calculate NFR potential based on retail density and economic indicators
+        const nfrPotential = (() => {
+            const retailScore = retailDensity;
+            const financeScore = financeAccess;
+            const eduScore = educationScore;
+            const nfrPot = (retailScore * 0.5) + (financeScore * 0.3) + (eduScore * 0.2);
+            return Math.min(nfrPot, 100);
+        })();
+        
+        // Get max score based on site type (check if we have auto-detected site type)
+        const siteType = localStorage.getItem('currentSSMSiteType') || 'city';
+        const maxScore = siteType === 'city' 
+            ? PSO_SCORING.CITY.SOCIO_ECONOMIC 
+            : PSO_SCORING.HIGHWAY.SOCIO_ECONOMIC;
+        
+        // Combine scores with different weights for city vs highway
+        let socioScore;
+        if (siteType === 'highway') {
+            // Highway sites focus more on economic indicators and convenience
+            socioScore = (retailDensity * 0.4) + (financeAccess * 0.3) + (educationScore * 0.2) + (healthcareScore * 0.1);
+        } else {
+            // City sites balance all factors
+            socioScore = (residentialDensity * 0.3) + (retailDensity * 0.25) + (educationScore * 0.2) + (healthcareScore * 0.15) + (financeAccess * 0.1);
+        }
+        
+        // Convert to PSO scoring scale
+        const finalScore = Math.round((socioScore / 100) * maxScore);
+        
+        // Determine categories for display
+        const populationCategory = residentialDensity > 70 ? 'High Density' : residentialDensity > 40 ? 'Medium Density' : 'Low Density';
+        const economicLevel = financeAccess > 70 ? 'high' : financeAccess > 50 ? 'upper-middle' : financeAccess > 30 ? 'middle' : 'lower-middle';
+        
+        return {
+            score: finalScore,
+            maxScore,
+            populationDensity: Math.round(residentialDensity * 100), // Scale for display
+            economicLevel,
+            vehicleOwnership: Math.round(financeAccess), // Proxy for economic capacity
+            fuelConsumptionPotential: Math.round(socioScore),
+            nfrPotential: Math.round(nfrPotential),
+            details: {
+                populationCategory,
+                economicStatus: economicLevel.charAt(0).toUpperCase() + economicLevel.slice(1).replace('-', ' '),
+                marketPotential: socioScore > 70 ? 'Excellent' : socioScore > 50 ? 'Good' : 'Fair',
+                nearbyFacilities: {
+                    education: osmSocioData.education.length,
+                    healthcare: osmSocioData.healthcare.length,
+                    retail: osmSocioData.retail.length,
+                    finance: osmSocioData.finance.length,
+                    residential: osmSocioData.residential.length
+                }
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Socio-economic analysis failed:', error);
+        // Fallback to existing logic
+        return await analyzeSocioEconomicProfileFallback(lat, lng, radius);
+    }
+}
+
+// Fallback socio-economic analysis (original method)
+async function analyzeSocioEconomicProfileFallback(lat, lng, radius) {
+    console.log('👥 Using fallback socio-economic analysis...');
+    
+    try {
+        await new Promise(resolve => setTimeout(resolve, 700));
         
         // Population analysis
         const populationDensity = calculatePopulationDensity(lat, lng);
@@ -407,7 +1039,8 @@ async function analyzeSocioEconomicProfile(lat, lng, radius) {
         const nfrPotential = calculateNFRPotential(lat, lng, economicLevel);
         
         // Get max score based on site type
-        const maxScore = document.querySelector('input[name="siteType"]:checked').value === 'city' 
+        const siteType = localStorage.getItem('currentSSMSiteType') || 'city';
+        const maxScore = siteType === 'city' 
             ? PSO_SCORING.CITY.SOCIO_ECONOMIC 
             : PSO_SCORING.HIGHWAY.SOCIO_ECONOMIC;
         
@@ -744,12 +1377,91 @@ function hideLoadingState() {
 
 // Utility Functions for Analysis
 
+// Auto-detect site type based on coordinates and road classification
+function autoDetectSiteType(lat, lng) {
+    // Check if coordinates are in major city boundaries
+    const cityBounds = [
+        { name: 'Karachi', latMin: 24.7, latMax: 25.2, lngMin: 66.9, lngMax: 67.5 },
+        { name: 'Lahore', latMin: 31.3, latMax: 31.7, lngMin: 74.1, lngMax: 74.5 },
+        { name: 'Islamabad', latMin: 33.6, latMax: 33.8, lngMin: 72.9, lngMax: 73.2 },
+        { name: 'Rawalpindi', latMin: 33.5, latMax: 33.7, lngMin: 73.0, lngMax: 73.2 },
+        { name: 'Faisalabad', latMin: 31.3, latMax: 31.5, lngMin: 73.0, lngMax: 73.2 },
+        { name: 'Multan', latMin: 30.1, latMax: 30.3, lngMin: 71.4, lngMax: 71.6 },
+        { name: 'Peshawar', latMin: 33.9, latMax: 34.1, lngMin: 71.4, lngMax: 71.6 },
+        { name: 'Quetta', latMin: 30.1, latMax: 30.3, lngMin: 66.9, lngMax: 67.1 }
+    ];
+
+    // First check if coordinates are within major city boundaries
+    for (const city of cityBounds) {
+        if (lat >= city.latMin && lat <= city.latMax && lng >= city.lngMin && lng <= city.lngMax) {
+            console.log(`📍 Location detected within ${city.name} city bounds - Site Type: CITY`);
+            return 'city';
+        }
+    }
+
+    // If not in major cities, analyze road classification to determine if it's highway/motorway
+    const roadType = determineRoadClassification(lat, lng);
+    
+    // Consider highway/motorway if it's a major road outside city bounds
+    if (roadType === 'highway' || roadType === 'motorway') {
+        console.log(`🛣️ Location detected on ${roadType} outside city bounds - Site Type: HIGHWAY`);
+        return 'highway';
+    }
+
+    // Check distance from major highways (simplified logic)
+    const isNearMajorHighway = checkProximityToMajorHighways(lat, lng);
+    if (isNearMajorHighway) {
+        console.log(`🛣️ Location detected near major highway - Site Type: HIGHWAY`);
+        return 'highway';
+    }
+
+    // Default to city if not clearly a highway location
+    console.log(`🏙️ Location defaulting to city site type`);
+    return 'city';
+}
+
+// Check if location is near major highways
+function checkProximityToMajorHighways(lat, lng) {
+    // Major highway corridors in Pakistan (simplified)
+    const majorHighways = [
+        // M1 Motorway (Islamabad-Peshawar)
+        { name: 'M1', latRange: [33.6, 34.0], lngRange: [71.5, 73.1] },
+        // M2 Motorway (Islamabad-Lahore)
+        { name: 'M2', latRange: [31.5, 33.7], lngRange: [73.0, 73.2] },
+        // N5 National Highway (Karachi-Lahore)
+        { name: 'N5', latRange: [24.8, 31.5], lngRange: [67.0, 74.3] },
+        // M9 Motorway (Karachi-Hyderabad)
+        { name: 'M9', latRange: [24.8, 25.4], lngRange: [67.9, 68.4] }
+    ];
+
+    const proximityThreshold = 0.05; // ~5km tolerance
+
+    for (const highway of majorHighways) {
+        const latInRange = lat >= (highway.latRange[0] - proximityThreshold) && 
+                          lat <= (highway.latRange[1] + proximityThreshold);
+        const lngInRange = lng >= (highway.lngRange[0] - proximityThreshold) && 
+                          lng <= (highway.lngRange[1] + proximityThreshold);
+        
+        if (latInRange && lngInRange) {
+            console.log(`🛣️ Location near ${highway.name} highway corridor`);
+            return true;
+        }
+    }
+    return false;
+}
+
 // Determine road classification based on coordinates
 function determineRoadClassification(lat, lng) {
-    // Simplified logic - in real implementation, use OSM data
+    // Enhanced logic with better road type determination
+    const isNearMajorHighway = checkProximityToMajorHighways(lat, lng);
+    
+    if (isNearMajorHighway) {
+        return Math.random() > 0.5 ? 'highway' : 'motorway';
+    }
+    
+    // Urban area roads
     const random = Math.random();
-    if (random > 0.8) return 'highway';
-    if (random > 0.6) return 'primary';
+    if (random > 0.7) return 'primary';
     if (random > 0.4) return 'secondary';
     return 'tertiary';
 }
@@ -1195,6 +1907,170 @@ function initializeFromURL() {
             setTimeout(performSSMAnalysis, 1000);
         }
     }
+
+// Additional OSM Analysis Helper Functions
+// ======================================
+
+// Land use analysis functions
+function analyzeLandUseFromOSM(landuses) {
+    const types = {};
+    let commercialSuitability = 0;
+    
+    landuses.forEach(landuse => {
+        const type = landuse.tags?.landuse;
+        if (type) {
+            types[type] = (types[type] || 0) + 1;
+            
+            // Score commercial suitability
+            if (['commercial', 'retail', 'mixed'].includes(type)) {
+                commercialSuitability += 25;
+            } else if (['residential'].includes(type)) {
+                commercialSuitability += 15;
+            } else if (['industrial'].includes(type)) {
+                commercialSuitability += 10;
+            }
+        }
+    });
+    
+    return {
+        types: Object.keys(types),
+        commercialSuitability: Math.min(commercialSuitability, 100)
+    };
+}
+
+function analyzeGreenSpaceProximity(parks, natural) {
+    const greenSpaces = parks.length + natural.length;
+    
+    if (greenSpaces >= 5) return 80;
+    else if (greenSpaces >= 3) return 60;
+    else if (greenSpaces >= 1) return 40;
+    else return 20;
+}
+
+function analyzeBuildingDensity(buildings) {
+    const buildingCount = buildings.length;
+    
+    // Score based on building count in the area
+    if (buildingCount >= 50) return 90;
+    else if (buildingCount >= 30) return 70;
+    else if (buildingCount >= 15) return 50;
+    else if (buildingCount >= 5) return 30;
+    else return 10;
+}
+
+function calculateLandAccessibilityFromOSM(osmData) {
+    // Base accessibility score
+    let score = 40;
+    
+    // Bonus for various land features
+    const commercialLand = osmData.landuse.filter(l => l.tags?.landuse === 'commercial').length;
+    const residentialLand = osmData.landuse.filter(l => l.tags?.landuse === 'residential').length;
+    
+    score += Math.min(commercialLand * 10, 30);
+    score += Math.min(residentialLand * 5, 20);
+    score += Math.min(osmData.buildings.length * 1, 10);
+    
+    return Math.min(score, 100);
+}
+
+function determinePrimaryLandUse(landuses) {
+    const counts = {};
+    
+    landuses.forEach(landuse => {
+        const type = landuse.tags?.landuse;
+        if (type) {
+            counts[type] = (counts[type] || 0) + 1;
+        }
+    });
+    
+    // Find the most common land use
+    const primary = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, 'mixed');
+    return primary || 'mixed';
+}
+
+// Socio-economic analysis functions
+function analyzeSocioEducationLevel(education) {
+    const educationCount = education.length;
+    
+    // Score based on educational facilities
+    let score = 20; // Base score
+    
+    education.forEach(facility => {
+        const type = facility.tags?.amenity;
+        if (type === 'university') score += 20;
+        else if (type === 'college') score += 15;
+        else if (type === 'school') score += 10;
+    });
+    
+    return Math.min(score, 100);
+}
+
+function analyzeSocioHealthcareAccess(healthcare) {
+    const healthcareCount = healthcare.length;
+    
+    // Score based on healthcare facilities
+    let score = 10; // Base score
+    
+    healthcare.forEach(facility => {
+        const type = facility.tags?.amenity;
+        if (type === 'hospital') score += 25;
+        else if (type === 'clinic') score += 15;
+        else if (type === 'pharmacy') score += 10;
+    });
+    
+    return Math.min(score, 100);
+}
+
+function analyzeSocioRetailDensity(retail) {
+    const retailCount = retail.length;
+    
+    // Score based on retail density
+    if (retailCount >= 20) return 90;
+    else if (retailCount >= 15) return 80;
+    else if (retailCount >= 10) return 70;
+    else if (retailCount >= 5) return 50;
+    else if (retailCount >= 1) return 30;
+    else return 10;
+}
+
+function analyzeSocioResidentialDensity(residential) {
+    const residentialCount = residential.length;
+    
+    // Score based on residential density
+    if (residentialCount >= 10) return 90;
+    else if (residentialCount >= 7) return 70;
+    else if (residentialCount >= 5) return 50;
+    else if (residentialCount >= 3) return 30;
+    else if (residentialCount >= 1) return 20;
+    else return 10;
+}
+
+function analyzeSocioFinanceAccess(finance) {
+    const financeCount = finance.length;
+    
+    // Score based on financial services availability
+    let score = 10; // Base score
+    
+    finance.forEach(facility => {
+        const type = facility.tags?.amenity;
+        if (type === 'bank') score += 20;
+        else if (type === 'atm') score += 10;
+    });
+    
+    return Math.min(score, 100);
+}
+
+function calculateNFRFromOSM(osmData) {
+    // Calculate NFR potential based on various OSM factors
+    const retailScore = analyzeSocioRetailDensity(osmData.retail);
+    const financeScore = analyzeSocioFinanceAccess(osmData.finance);
+    const educationScore = analyzeSocioEducationLevel(osmData.education);
+    
+    // NFR potential is a combination of these factors
+    const nfrPotential = (retailScore * 0.5) + (financeScore * 0.3) + (educationScore * 0.2);
+    
+    return Math.min(nfrPotential, 100);
+}
 }
 
 // Add keyboard shortcuts

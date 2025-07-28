@@ -112,7 +112,7 @@
                             class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Analysis</a>
                     </li>
                     <li>
-                        <a href="#"
+                        <a href="ssm.html"
                             class="block py-3 px-4 text-yellow-400 bg-gray-700 rounded md:bg-transparent md:p-0 transition-all duration-300 hover:text-yellow-300">SSM</a>
                     </li>
                 </ul>
@@ -121,94 +121,59 @@
     </nav>
 
     <!-- Main Content -->
-    <main class="container mx-auto px-4 py-12">
+    <div class="max-w-screen-xl mx-auto px-4 py-6">
 
-        <!-- Header Section -->
-        <section class="text-center mb-16">
-            <h1 class="text-center text-4xl md:text-6xl font-extrabold mb-6 text-yellow-400 leading-tight">
-                <span class="block">Site Selection Metrics</span>
-                <span class="block text-yellow-500">PSO Classification System</span>
-            </h1>
-            <p class="text-2xl md:text-3xl text-gray-300 mb-8 font-light max-w-4xl mx-auto leading-relaxed">
-                Comprehensive site evaluation based on PSO's standardized criteria for optimal fuel station placement
-            </p>
-        </section>
-
-        <!-- Coordinate Input Section -->
-        <section class="bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 mb-8">
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center space-x-3">
-                    <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-map-marker-alt text-blue-400 text-xl"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-white">Site Coordinates</h2>
-                </div>
-                <button onclick="syncCoordinatesFromMap()" 
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center">
-                    <i class="fas fa-sync mr-2"></i>
-                    Sync from Map
-                </button>
+        <!-- Site Parameters Section -->
+        <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6 mb-6">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-chart-line text-blue-400 text-xl mr-3"></i>
+                <h2 class="text-2xl font-bold text-white">Site Selection Parameters</h2>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <!-- Latitude -->
                 <div>
-                    <label class="flex items-center space-x-2 text-sm font-medium text-green-400 mb-2">
-                        <i class="fas fa-globe mr-1"></i>
-                        <span>Latitude</span>
+                    <label class="flex items-center text-green-400 text-sm font-medium mb-2">
+                        <i class="fas fa-map-marker-alt mr-2"></i>
+                        Latitude
                     </label>
                     <input type="number" id="ssm-latitude" step="any" value="24.848376"
-                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300">
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all duration-300">
                 </div>
 
                 <!-- Longitude -->
                 <div>
-                    <label class="flex items-center space-x-2 text-sm font-medium text-green-400 mb-2">
-                        <i class="fas fa-globe mr-1"></i>
-                        <span>Longitude</span>
+                    <label class="flex items-center text-green-400 text-sm font-medium mb-2">
+                        <i class="fas fa-map-marker-alt mr-2"></i>
+                        Longitude
                     </label>
                     <input type="number" id="ssm-longitude" step="any" value="67.113880"
-                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300">
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all duration-300">
                 </div>
 
                 <!-- Analysis Radius -->
                 <div>
-                    <label class="flex items-center space-x-2 text-sm font-medium text-green-400 mb-2">
-                        <i class="fas fa-circle-notch mr-1"></i>
-                        <span>Analysis Radius (km)</span>
+                    <label class="flex items-center text-green-400 text-sm font-medium mb-2">
+                        <i class="fas fa-circle-notch mr-2"></i>
+                        Radius (km)
                     </label>
                     <input type="number" id="ssm-radius" value="2" min="0.5" max="5" step="0.5"
-                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300">
-                </div>
-
-                <!-- Analyze Button -->
-                <div class="flex items-end">
-                    <button id="analyzeSSMBtn" onclick="performSSMAnalysis()"
-                        class="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2">
-                        <i class="fas fa-chart-line text-xl"></i>
-                        <span>Analyze Site</span>
-                    </button>
+                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all duration-300">
                 </div>
             </div>
 
-            <!-- Site Type Selection -->
-            <div class="flex items-center justify-center space-x-8">
-                <label class="text-lg font-medium text-green-400">Site Type:</label>
-                <div class="flex space-x-6">
-                    <label class="flex items-center cursor-pointer">
-                        <input type="radio" name="siteType" value="city" checked class="mr-3 text-blue-600 w-5 h-5">
-                        <span class="text-white text-lg font-medium">City Site</span>
-                    </label>
-                    <label class="flex items-center cursor-pointer">
-                        <input type="radio" name="siteType" value="highway" class="mr-3 text-blue-600 w-5 h-5">
-                        <span class="text-white text-lg font-medium">Highway/Motorway Site</span>
-                    </label>
-                </div>
+            <!-- Action Button -->
+            <div class="flex flex-wrap gap-4">
+                <button id="analyzeSSMBtn" onclick="performSSMAnalysis()"
+                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center">
+                    <i class="fas fa-chart-line mr-2"></i>
+                    Analyze Site
+                </button>
             </div>
-        </section>
+        </div>
 
         <!-- Site Classification Result -->
-        <section id="classificationResult" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 mb-8">
+        <div id="classificationResult" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8 mb-8">
             <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-white mb-6">Site Classification Result</h2>
                 
@@ -237,10 +202,10 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
         <!-- Detailed Parameter Analysis -->
-        <section id="parameterAnalysis" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div id="parameterAnalysis" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             
             <!-- Traffic Analysis -->
             <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
@@ -361,10 +326,10 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
         <!-- Score Breakdown Chart -->
-        <section id="chartSection" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 mb-8">
+        <div id="chartSection" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8 mb-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div>
                     <h3 class="text-2xl font-bold text-white mb-6">Score Breakdown</h3>
@@ -404,7 +369,7 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
         <!-- Loading Indicator -->
         <div id="loadingIndicator" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-12">
@@ -422,7 +387,7 @@
             </div>
         </div>
        
-    </main>
+    </div>
     <!-- JavaScript -->
     <script src="ssm.js"></script>
 
