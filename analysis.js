@@ -174,6 +174,13 @@ function analyzeLandUse(data) {
             fuelStations: 0,
             restaurants: 0
         },
+        amenityDetails: {
+            schools: [],
+            universities: [],
+            malls: [],
+            fuelStations: [],
+            restaurants: []
+        },
         roads: {
             highways: 0,
             primary: 0,
@@ -183,6 +190,26 @@ function analyzeLandUse(data) {
     
     data.elements.forEach(element => {
         const tags = element.tags || {};
+        
+        // Helper function to get element name
+        function getElementName(element) {
+            const tags = element.tags || {};
+            return tags.name || tags.brand || tags.operator || 'Unnamed';
+        }
+        
+        // Helper function to get element coordinates
+        function getElementCoords(element) {
+            if (element.lat && element.lon) {
+                return { lat: element.lat, lng: element.lon };
+            } else if (element.geometry && element.geometry.length > 0) {
+                // For ways, use the center point
+                const coords = element.geometry;
+                const centerLat = coords.reduce((sum, coord) => sum + coord.lat, 0) / coords.length;
+                const centerLng = coords.reduce((sum, coord) => sum + coord.lon, 0) / coords.length;
+                return { lat: centerLat, lng: centerLng };
+            }
+            return null;
+        }
         
         // Analyze land use
         if (tags.landuse) {
@@ -224,33 +251,88 @@ function analyzeLandUse(data) {
             }
         }
         
-        // Analyze amenities
+        // Analyze amenities with details
         if (tags.amenity) {
+            const coords = getElementCoords(element);
+            const name = getElementName(element);
+            
             switch (tags.amenity) {
                 case 'school':
                     analysis.amenities.schools++;
+                    analysis.amenityDetails.schools.push({
+                        name: name,
+                        coordinates: coords,
+                        type: tags.school || 'School',
+                        address: tags['addr:full'] || tags['addr:street'] || '',
+                        website: tags.website || '',
+                        phone: tags.phone || ''
+                    });
                     break;
                 case 'university':
                 case 'college':
                     analysis.amenities.universities++;
+                    analysis.amenityDetails.universities.push({
+                        name: name,
+                        coordinates: coords,
+                        type: tags.amenity === 'university' ? 'University' : 'College',
+                        address: tags['addr:full'] || tags['addr:street'] || '',
+                        website: tags.website || '',
+                        phone: tags.phone || ''
+                    });
                     break;
                 case 'fuel':
                     analysis.amenities.fuelStations++;
+                    analysis.amenityDetails.fuelStations.push({
+                        name: name,
+                        coordinates: coords,
+                        brand: tags.brand || '',
+                        operator: tags.operator || '',
+                        address: tags['addr:full'] || tags['addr:street'] || '',
+                        opening_hours: tags.opening_hours || ''
+                    });
                     break;
                 case 'restaurant':
                 case 'fast_food':
                     analysis.amenities.restaurants++;
+                    analysis.amenityDetails.restaurants.push({
+                        name: name,
+                        coordinates: coords,
+                        type: tags.amenity === 'restaurant' ? 'Restaurant' : 'Fast Food',
+                        cuisine: tags.cuisine || '',
+                        address: tags['addr:full'] || tags['addr:street'] || '',
+                        phone: tags.phone || '',
+                        opening_hours: tags.opening_hours || ''
+                    });
                     break;
                 case 'marketplace':
                     analysis.amenities.malls++;
+                    analysis.amenityDetails.malls.push({
+                        name: name,
+                        coordinates: coords,
+                        type: 'Marketplace',
+                        address: tags['addr:full'] || tags['addr:street'] || '',
+                        opening_hours: tags.opening_hours || ''
+                    });
                     break;
             }
         }
         
         // Analyze shops
         if (tags.shop) {
+            const coords = getElementCoords(element);
+            const name = getElementName(element);
+            
             if (tags.shop === 'mall') {
                 analysis.amenities.malls++;
+                analysis.amenityDetails.malls.push({
+                    name: name,
+                    coordinates: coords,
+                    type: 'Shopping Mall',
+                    address: tags['addr:full'] || tags['addr:street'] || '',
+                    opening_hours: tags.opening_hours || '',
+                    website: tags.website || '',
+                    phone: tags.phone || ''
+                });
             }
             analysis.commercial++; // All shops count as commercial
         }
@@ -267,7 +349,7 @@ function analyzeLandUse(data) {
                     break;
                 case 'secondary':
                     analysis.roads.secondary++;
-                    break;
+                    break;  
             }
         }
     });
@@ -490,8 +572,14 @@ function addLandUseToMap(data) {
     return areaAnalysis;
 }
 
+// Global variable to store amenity details for tooltips
+window.currentAmenityDetails = {};
+
 // Update UI with analysis results (area-based)
 function updateUI(analysis, areaAnalysis = null) {
+    // Store amenity details globally for tooltip access
+    window.currentAmenityDetails = analysis.amenityDetails || {};
+    
     // Update site type and area status
     const siteType = determineSiteType(analysis);
     const dominantLandUse = determineDominantLandUse(analysis);
@@ -515,6 +603,9 @@ function updateUI(analysis, areaAnalysis = null) {
     document.getElementById('mallCount').textContent = analysis.amenities.malls;
     document.getElementById('fuelStationCount').textContent = analysis.amenities.fuelStations;
     document.getElementById('restaurantCount').textContent = analysis.amenities.restaurants;
+    
+    // Update tooltips with actual data
+    updateTooltipContent();
     
     // Update chart with area data if available, otherwise use counts
     const chartData = areaAnalysis || {
@@ -570,7 +661,83 @@ function updateUI(analysis, areaAnalysis = null) {
     }
 }
 
-// Show loading state
+// Function to update tooltip content with amenity details
+function updateTooltipContent() {
+    const amenityDetails = window.currentAmenityDetails || {};
+    
+    // Update Universities tooltip
+    updateAmenityTooltip('universities', amenityDetails.universities || [], (item) => `
+        <div class="tooltip-item">
+            <div class="tooltip-item-name">${item.name}</div>
+            <div class="tooltip-item-type text-blue-300">${item.type}</div>
+            ${item.address ? `<div class="tooltip-item-address text-gray-400">${item.address}</div>` : ''}
+            ${item.website ? `<div class="tooltip-item-website text-blue-400">${item.website}</div>` : ''}
+        </div>
+    `);
+    
+    // Update Schools tooltip
+    updateAmenityTooltip('schools', amenityDetails.schools || [], (item) => `
+        <div class="tooltip-item">
+            <div class="tooltip-item-name">${item.name}</div>
+            <div class="tooltip-item-type text-green-300">${item.type}</div>
+            ${item.address ? `<div class="tooltip-item-address text-gray-400">${item.address}</div>` : ''}
+            ${item.phone ? `<div class="tooltip-item-phone text-gray-400">${item.phone}</div>` : ''}
+        </div>
+    `);
+    
+    // Update Malls tooltip
+    updateAmenityTooltip('malls', amenityDetails.malls || [], (item) => `
+        <div class="tooltip-item">
+            <div class="tooltip-item-name">${item.name}</div>
+            <div class="tooltip-item-type text-purple-300">${item.type}</div>
+            ${item.address ? `<div class="tooltip-item-address text-gray-400">${item.address}</div>` : ''}
+            ${item.opening_hours ? `<div class="tooltip-item-hours text-gray-400">Hours: ${item.opening_hours}</div>` : ''}
+        </div>
+    `);
+    
+    // Update Fuel Stations tooltip
+    updateAmenityTooltip('fuel', amenityDetails.fuelStations || [], (item) => `
+        <div class="tooltip-item">
+            <div class="tooltip-item-name">${item.name}</div>
+            <div class="tooltip-item-brand text-yellow-300">${item.brand || item.operator || 'Fuel Station'}</div>
+            ${item.address ? `<div class="tooltip-item-address text-gray-400">${item.address}</div>` : ''}
+            ${item.opening_hours ? `<div class="tooltip-item-hours text-gray-400">Hours: ${item.opening_hours}</div>` : ''}
+        </div>
+    `);
+    
+    // Update Restaurants tooltip
+    updateAmenityTooltip('restaurants', amenityDetails.restaurants || [], (item) => `
+        <div class="tooltip-item">
+            <div class="tooltip-item-name">${item.name}</div>
+            <div class="tooltip-item-type text-red-300">${item.type}${item.cuisine ? ` - ${item.cuisine}` : ''}</div>
+            ${item.address ? `<div class="tooltip-item-address text-gray-400">${item.address}</div>` : ''}
+            ${item.phone ? `<div class="tooltip-item-phone text-gray-400">${item.phone}</div>` : ''}
+        </div>
+    `);
+}
+
+// Helper function to update individual amenity tooltip
+function updateAmenityTooltip(amenityType, items, formatFunction) {
+    const tooltipList = document.getElementById(`${amenityType}-tooltip-list`);
+    if (!tooltipList) return;
+    
+    if (items.length === 0) {
+        tooltipList.innerHTML = '<div class="tooltip-item text-gray-500">No data found in this area</div>';
+        return;
+    }
+    
+    // Limit to top 10 items to avoid overly long tooltips
+    const displayItems = items.slice(0, 10);
+    const tooltipContent = displayItems.map(formatFunction).join('');
+    
+    if (items.length > 10) {
+        tooltipList.innerHTML = tooltipContent + `<div class="tooltip-item text-gray-400 text-xs mt-2">...and ${items.length - 10} more</div>`;
+    } else {
+        tooltipList.innerHTML = tooltipContent;
+    }
+}
+
+// Show loading state with progressive steps
 function showLoading() {
     document.getElementById('loadingIndicator').classList.remove('hidden');
     document.getElementById('analyzeBtn').disabled = true;
@@ -581,18 +748,68 @@ function showLoading() {
         </svg>
         Analyzing...
     `;
+    
+    // Reset loading steps
+    resetLoadingSteps();
+    
+    // Progressive step animation
+    setTimeout(() => updateLoadingStep(1), 500);
+    setTimeout(() => updateLoadingStep(2), 1500);
+    setTimeout(() => updateLoadingStep(3), 2500);
+}
+
+// Update loading step visibility
+function updateLoadingStep(step) {
+    const stepElement = document.getElementById(`loadingStep${step}`);
+    if (stepElement) {
+        stepElement.classList.remove('opacity-30');
+        stepElement.classList.add('opacity-100', 'text-yellow-300');
+        
+        // Add checkmark when complete
+        if (step < 3) {
+            setTimeout(() => {
+                stepElement.innerHTML = stepElement.innerHTML.replace('🔍', '✅').replace('🏗️', '✅').replace('📊', '✅');
+            }, 800);
+        }
+    }
+}
+
+// Reset loading steps
+function resetLoadingSteps() {
+    for (let i = 1; i <= 3; i++) {
+        const stepElement = document.getElementById(`loadingStep${i}`);
+        if (stepElement) {
+            stepElement.classList.remove('opacity-100', 'text-yellow-300');
+            stepElement.classList.add('opacity-30');
+            
+            // Reset icons
+            if (i === 1) stepElement.innerHTML = 'Querying OpenStreetMap...';
+            if (i === 2) stepElement.innerHTML = 'Processing land use data...';
+            if (i === 3) stepElement.innerHTML = 'Generating analysis...';
+        }
+    }
 }
 
 // Hide loading state
 function hideLoading() {
-    document.getElementById('loadingIndicator').classList.add('hidden');
-    document.getElementById('analyzeBtn').disabled = false;
-    document.getElementById('analyzeBtn').innerHTML = `
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z"></path>
-        </svg>
-        <span>Analyze Area</span>
-    `;
+    // Show completion step briefly before hiding
+    updateLoadingStep(3);
+    const step3 = document.getElementById('loadingStep3');
+    if (step3) {
+        step3.innerHTML = '✅ Analysis complete!';
+        step3.classList.add('text-green-400');
+    }
+    
+    setTimeout(() => {
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        document.getElementById('analyzeBtn').disabled = false;
+        document.getElementById('analyzeBtn').innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z"></path>
+            </svg>
+            <span>Analyze Area</span>
+        `;
+    }, 800);
 }
 
 function getCookie(name) {
@@ -629,7 +846,6 @@ function loadCoordinatesFromCookies() {
             radius: savedRadius 
         });
         
-        // Optional: Show a brief notification that coordinates were loaded
         Toastify({
             text: "Coordinates loaded from previous search",
             duration: 2000,
@@ -645,7 +861,6 @@ function loadCoordinatesFromCookies() {
         }
 }
 
-// Main analysis function
 async function startAnalysis() {
     const lat = parseFloat(document.getElementById('latitude').value);
     const lng = parseFloat(document.getElementById('longitude').value);
@@ -665,16 +880,16 @@ async function startAnalysis() {
     showLoading();
     
     try {
-        // Build and execute Overpass query
+        // Build and execute Overpass query for land use analysis only
         const query = buildOverpassQuery(lat, lng, radius);
-        console.log('Executing Overpass query...');
+        console.log('Executing Overpass query for land use...');
         
         const data = await fetchOverpassData(query);
-        console.log('Received data:', data);
+        console.log('Received land use data:', data);
         
-        // Analyze the data
+        // Analyze the land use data (no amenities here)
         const analysis = analyzeLandUse(data);
-        console.log('Analysis results:', analysis);
+        console.log('Land use analysis results:', analysis);
         
         // Add polygons to map and get area analysis
         const areaAnalysis = addLandUseToMap(data);
@@ -686,8 +901,14 @@ async function startAnalysis() {
         // Update map with new center and radius
         map.setView([lat, lng], 13);
         
-        // Update UI with both count and area data
+        // Update UI with land use data only (amenities handled by HTML)
         updateUI(analysis, areaAnalysis);
+        
+        // Now update unified amenity data via the HTML system
+        if (window.updateAmenityDataForAnalysis) {
+            console.log('Updating unified amenity data...');
+            await window.updateAmenityDataForAnalysis();
+        }
         
     } catch (error) {
         console.error('Analysis failed:', error);

@@ -60,17 +60,8 @@ let elementIdCounter = 0;
                 return;
             }
 
-            const searchBtn = document.getElementById('searchBtn');
-            searchBtn.disabled = true;
-            searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
-
-            // Show loading
-            document.getElementById('results-list').innerHTML = `
-                <div class="loading">
-                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                    <p>Searching for fuel stations...</p>
-                </div>
-            `;
+            // Show enhanced loading overlay
+            showLoading();
 
             try {
                 // Clear previous markers
@@ -107,8 +98,8 @@ let elementIdCounter = 0;
                     </div>
                 `;
             } finally {
-                searchBtn.disabled = false;
-                searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search Stations';
+                // Hide enhanced loading overlay
+                hideLoading();
             }
         }
 
@@ -274,6 +265,81 @@ let elementIdCounter = 0;
                     map.removeLayer(layer);
                 }
             });
+        }
+
+        // Show loading state with progressive steps
+        function showLoading() {
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+            const searchBtn = document.getElementById('searchBtn');
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = `
+                <svg class="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Searching...
+            `;
+            
+            // Reset loading steps
+            resetLoadingSteps();
+            
+            // Progressive step animation
+            setTimeout(() => updateLoadingStep(1), 500);
+            setTimeout(() => updateLoadingStep(2), 1500);
+            setTimeout(() => updateLoadingStep(3), 2500);
+        }
+
+        // Update loading step visibility
+        function updateLoadingStep(step) {
+            const stepElement = document.getElementById(`loadingStep${step}`);
+            if (stepElement) {
+                stepElement.classList.remove('opacity-30');
+                stepElement.classList.add('opacity-100', 'text-yellow-300');
+                
+                // Add checkmark when complete
+                if (step < 3) {
+                    setTimeout(() => {
+                        stepElement.innerHTML = stepElement.innerHTML.replace('🔍', '✅').replace('🏗️', '✅').replace('📊', '✅');
+                    }, 800);
+                }
+            }
+        }
+
+        // Reset loading steps
+        function resetLoadingSteps() {
+            for (let i = 1; i <= 3; i++) {
+                const stepElement = document.getElementById(`loadingStep${i}`);
+                if (stepElement) {
+                    stepElement.classList.remove('opacity-100', 'text-yellow-300');
+                    stepElement.classList.add('opacity-30');
+                    
+                    // Reset text
+                    if (i === 1) stepElement.innerHTML = 'Querying station database...';
+                    if (i === 2) stepElement.innerHTML = 'Processing station data...';
+                    if (i === 3) stepElement.innerHTML = 'Calculating distances...';
+                }
+            }
+        }
+
+        // Hide loading state
+        function hideLoading() {
+            // Show completion step briefly before hiding
+            updateLoadingStep(3);
+            const step3 = document.getElementById('loadingStep3');
+            if (step3) {
+                step3.innerHTML = '✅ Search complete!';
+                step3.classList.add('text-green-400');
+            }
+            
+            setTimeout(() => {
+                document.getElementById('loadingIndicator').classList.add('hidden');
+                const searchBtn = document.getElementById('searchBtn');
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = `
+                    <i class="fas fa-search mr-2"></i>
+                    Search Stations
+                `;
+            }, 800);
         }
 
         // Placeholder functions
@@ -1269,7 +1335,7 @@ let routingDistances = new Map();
 
 // Initialize map
 function initMap() {
-    map = L.map('map').setView([25.3730, 68.3512], 12);
+    map = L.map('map').setView([25.3730, 68.3512], 15);
 
     // Layer Control
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1496,17 +1562,8 @@ function loadCoordinatesFromCookies() {
         setCookie('map_radius', radius, 7);
         console.log('Coordinates saved to cookies:', { lat, lng, radius });
         
-        const searchBtn = document.getElementById('searchBtn');
-        searchBtn.disabled = true;
-        searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Searching...';
-
-        // Show loading
-        document.getElementById('results-list').innerHTML = `
-            <div class="loading">
-                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                <p>Searching for fuel stations...</p>
-            </div>
-        `;
+        // Show enhanced loading overlay
+        showLoading();
 
         try {
             // Clear previous markers
@@ -1546,16 +1603,9 @@ function loadCoordinatesFromCookies() {
             // Show initial results
             displayStationResults(stations);
             
-            // Update loading message
-            document.getElementById('results-list').innerHTML = `
-                <div class="loading">
-                    <i class="fas fa-route fa-spin text-2xl mb-2"></i>
-                    <p>Calculating precise road distances...</p>
-                    <div class="text-sm text-gray-400 mt-2">
-                        Using OpenRouteService + GraphHopper for accuracy
-                    </div>
-                </div>
-            `;
+            // Update loading text for distance calculation phase
+            document.getElementById('loadingIndicator').querySelector('.text-white.font-semibold').textContent = 'Calculating Distances...';
+            document.getElementById('loadingIndicator').querySelector('.text-gray-300.text-sm').textContent = 'Computing precise road distances using routing services';
 
             // Calculate accurate distances with multiple routing services
             await fetchDistancesWithRouting(lat, lng, stations);
@@ -1572,8 +1622,8 @@ function loadCoordinatesFromCookies() {
                 </div>
             `;
         } finally {
-            searchBtn.disabled = false;
-            searchBtn.innerHTML = '<i class="fas fa-search mr-2"></i>Search Stations';
+            // Hide enhanced loading overlay
+            hideLoading();
         }
     }
 

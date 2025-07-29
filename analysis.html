@@ -26,6 +26,182 @@
             }
         }
     </script>
+    <style>
+        /* Tooltip Styles */
+        .amenity-tooltip {
+            position: absolute;
+            left: 50%;
+            top: -10px;
+            transform: translateX(-50%) translateY(-100%);
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            border: 1px solid #374151;
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 280px;
+            max-width: 320px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+
+        .amenity-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #1f2937;
+        }
+
+        .amenity-item:hover .amenity-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-100%) translateY(-8px);
+        }
+
+        .amenity-item {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .amenity-item:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, rgba(55, 65, 81, 0.6) 0%, rgba(31, 41, 55, 0.6) 100%) !important;
+        }
+
+        .tooltip-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #374151;
+        }
+
+        .tooltip-list {
+            max-height: 200px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #4b5563 transparent;
+        }
+
+        .tooltip-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .tooltip-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .tooltip-list::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 2px;
+        }
+
+        .tooltip-item {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(55, 65, 81, 0.3);
+            transition: color 0.2s ease;
+            font-size: 13px;
+            color: #d1d5db;
+        }
+
+        .tooltip-item:last-child {
+            border-bottom: none;
+        }
+
+        .tooltip-item:hover {
+            color: #fbbf24;
+        }
+
+        /* New styles for detailed tooltip items */
+        .tooltip-item-name {
+            font-weight: 600;
+            color: #f9fafb;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .tooltip-item-type {
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .tooltip-item-address,
+        .tooltip-item-phone,
+        .tooltip-item-website,
+        .tooltip-item-hours,
+        .tooltip-item-brand {
+            font-size: 11px;
+            margin-bottom: 1px;
+        }
+
+        .tooltip-item-website {
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .tooltip-item-website:hover {
+            color: #60a5fa !important;
+        }
+
+        /* Loading shimmer for tooltip content */
+        .tooltip-loading {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            height: 12px;
+            border-radius: 6px;
+            margin: 4px 0;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
+        }
+
+        /* Enhanced Loading Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spinGlow {
+            0% {
+                transform: rotate(0deg);
+                box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+            }
+            100% {
+                transform: rotate(360deg);
+                box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+            }
+        }
+
+        #loadingIndicator .bg-gray-800\/95 {
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        #loadingIndicator .animate-spin {
+            animation: spinGlow 2s linear infinite;
+        }
+
+        #loadingIndicator .animate-pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
 </head>
 
 <body class="bg-gray-900 min-h-screen">
@@ -136,7 +312,7 @@
                 <!-- Analyze Button -->
                 <div class="flex items-end">
                     <button id="analyzeBtn" onclick="startAnalysis(); analyzeTrafficArea(); analyzePopulationArea()"
-                        class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2">
+                        class="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z"></path>
                         </svg>
@@ -267,43 +443,6 @@
                     </div>
                     <div id="populationMap" class="h-96 w-full"></div>
                 </div>
-
-                <!-- Site Classification -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    <!-- Site Type -->
-                    <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                        <div class="flex items-center space-x-3 mb-4">
-                            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                </svg>
-                            </div>
-                            <h4 class="text-lg font-semibold text-white">Site Type</h4>
-                        </div>
-                        <div id="siteType" class="text-2xl font-bold text-yellow-400">
-                            <div class="animate-pulse bg-gray-600 h-8 rounded-lg w-24"></div>
-                        </div>
-                        <p class="text-sm text-gray-400 mt-2">Based on surrounding infrastructure</p>
-                    </div>
-
-                    <!-- Area Status -->
-                    <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                        <div class="flex items-center space-x-3 mb-4">
-                            <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                                <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0v-5a1 1 0 011-1h4a1 1 0 011 1v5m-4 0h4"></path>
-                                </svg>
-                            </div>
-                            <h4 class="text-lg font-semibold text-white">Dominant Land Use</h4>
-                        </div>
-                        <div id="areaStatus" class="text-2xl font-bold text-green-400">
-                            <div class="animate-pulse bg-gray-600 h-8 rounded-lg w-32"></div>
-                        </div>
-                        <p class="text-sm text-gray-400 mt-2">Primary zoning classification</p>
-                    </div>
-                </div>
             </div>
 
             <!-- Right Column - Statistics and Charts -->
@@ -346,18 +485,50 @@
                     </div>
                 </div>
 
+                <!-- Site Type -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <svg class="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </div>
+                        <h4 class="text-xl font-semibold text-white">Site Type</h4>
+                    </div>
+                    <div id="siteType" class="text-3xl font-bold text-yellow-400 mb-4">
+                        <div class="animate-pulse bg-gray-600 h-10 rounded-lg w-32"></div>
+                    </div>
+                    <p class="text-base text-gray-400 mt-4">Based on surrounding infrastructure</p>
+                </div>
+
+                <!-- Dominant Land Use -->
+                <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <svg class="w-7 h-7 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0v-5a1 1 0 011-1h4a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                        </div>
+                        <h4 class="text-xl font-semibold text-white">Dominant Land Use</h4>
+                    </div>
+                    <div id="areaStatus" class="text-3xl font-bold text-green-400 mb-4">
+                        <div class="animate-pulse bg-gray-600 h-10 rounded-lg w-40"></div>
+                    </div>
+                    <p class="text-base text-gray-400 mt-4">Primary zoning classification</p>
+                </div>
 
                 <!-- Amenities Analysis -->
                 <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
                     <div class="flex items-center space-x-2 mb-6">
-                        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-6 h-20 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m4 0v-5a1 1 0 011-1h4a1 1 0 011 1v5m-4 0h4"></path>
                         </svg>
                         <h4 class="text-lg font-semibold text-white">Key Amenities</h4>
                     </div>
                     
                     <div class="space-y-4">
-                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                        <div class="amenity-item flex items-center justify-between p-3 bg-gray-700/30 rounded-lg relative">
                             <div class="flex items-center space-x-3">
                                 <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
                                     <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -367,9 +538,18 @@
                                 <span class="text-white font-medium">Universities</span>
                             </div>
                             <span id="universityCount" class="text-xl font-bold text-blue-400">-</span>
+                            <div class="amenity-tooltip">
+                                <div class="tooltip-header">
+                                    <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
+                                    <span class="text-white font-semibold text-sm">Universities Nearby</span>
+                                </div>
+                                <div class="tooltip-list" id="universities-tooltip-list">
+                                    <div class="tooltip-item text-gray-500">Click "Analyze Area" to load data</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                        <div class="amenity-item flex items-center justify-between p-3 bg-gray-700/30 rounded-lg relative">
                             <div class="flex items-center space-x-3">
                                 <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
                                     <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -379,9 +559,18 @@
                                 <span class="text-white font-medium">Schools</span>
                             </div>
                             <span id="schoolCount" class="text-xl font-bold text-green-400">-</span>
+                            <div class="amenity-tooltip">
+                                <div class="tooltip-header">
+                                    <div class="w-3 h-3 bg-green-400 rounded-full mr-2"></div>
+                                    <span class="text-white font-semibold text-sm">Schools Nearby</span>
+                                </div>
+                                <div class="tooltip-list" id="schools-tooltip-list">
+                                    <div class="tooltip-item text-gray-500">Click "Analyze Area" to load data</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                        <div class="amenity-item flex items-center justify-between p-3 bg-gray-700/30 rounded-lg relative">
                             <div class="flex items-center space-x-3">
                                 <div class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
                                     <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,22 +580,40 @@
                                 <span class="text-white font-medium">Malls</span>
                             </div>
                             <span id="mallCount" class="text-xl font-bold text-purple-400">-</span>
+                            <div class="amenity-tooltip">
+                                <div class="tooltip-header">
+                                    <div class="w-3 h-3 bg-purple-400 rounded-full mr-2"></div>
+                                    <span class="text-white font-semibold text-sm">Shopping Malls</span>
+                                </div>
+                                <div class="tooltip-list" id="malls-tooltip-list">
+                                    <div class="tooltip-item text-gray-500">Click "Analyze Area" to load data</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                        <div class="amenity-item flex items-center justify-between p-3 bg-gray-700/30 rounded-lg relative">
                             <div class="flex items-center space-x-3">
                                 <div class="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center">
                                     <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"></path>
                                     </svg>
-                                </div>
+                                </div>  
                                 <span class="text-white font-medium">Fuel Stations</span>
                             </div>
                             <span id="fuelStationCount" class="text-xl font-bold text-yellow-400">-</span>
+                            <div class="amenity-tooltip">
+                                <div class="tooltip-header">
+                                    <div class="w-3 h-3 bg-yellow-400 rounded-full mr-2"></div>
+                                    <span class="text-white font-semibold text-sm">Fuel Stations</span>
+                                </div>
+                                <div class="tooltip-list" id="fuel-tooltip-list">
+                                    <div class="tooltip-item text-gray-500">Click "Analyze Area" to load data</div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+                        <div class="amenity-item flex items-center justify-between p-3 bg-gray-700/30 rounded-lg relative">
                             <div class="flex items-center space-x-3">
                                 <div class="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
                                     <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -416,17 +623,55 @@
                                 <span class="text-white font-medium">Restaurants</span>
                             </div>
                             <span id="restaurantCount" class="text-xl font-bold text-red-400">-</span>
+                            <div class="amenity-tooltip">
+                                <div class="tooltip-header">
+                                    <div class="w-3 h-3 bg-red-400 rounded-full mr-2"></div>
+                                    <span class="text-white font-semibold text-sm">Restaurants</span>
+                                </div>
+                                <div class="tooltip-list" id="restaurants-tooltip-list">
+                                    <div class="tooltip-item text-gray-500">Click "Analyze Area" to load data</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Loading Indicator -->
-                <div id="loadingIndicator" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8">
-                    <div class="flex flex-col items-center justify-center space-y-4">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
-                        <p class="text-white font-medium">Analyzing area data...</p>
-                        <p class="text-sm text-gray-400 text-center">Fetching land use information and amenities from OpenStreetMap</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Loading Overlay -->
+    <div id="loadingIndicator" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-gray-800/95 backdrop-blur-lg rounded-2xl border border-gray-600/50 p-10 max-w-md mx-4 shadow-2xl">
+            <div class="flex flex-col items-center justify-center space-y-6">
+                <!-- Enhanced Spinner -->
+                <div class="relative">
+                    <div class="animate-spin rounded-full h-16 w-16 border-4 border-gray-600"></div>
+                    <div class="animate-spin rounded-full h-16 w-16 border-4 border-yellow-400 border-t-transparent absolute top-0 left-0"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div class="w-6 h-6 bg-yellow-400 rounded-full animate-pulse"></div>
                     </div>
+                </div>
+                
+                <!-- Loading Text -->
+                <div class="text-center space-y-2">
+                    <p class="text-white font-semibold text-xl">Analyzing Area Data...</p>
+                    <p class="text-gray-300 text-sm">Fetching land use information and amenities from OpenStreetMap</p>
+                </div>
+                
+                <!-- Progress Dots -->
+                <div class="flex space-x-2">
+                    <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                    <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                    <div class="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+                </div>
+                
+                <!-- Loading Steps -->
+                <div class="text-center space-y-1 text-xs text-gray-400">
+                    <div id="loadingStep1" class="opacity-50">Querying Google Maps...</div>
+                    <div id="loadingStep2" class="opacity-30">Processing land use data...</div>
+                    <div id="loadingStep3" class="opacity-30">Generating analysis...</div>
                 </div>
             </div>
         </div>
