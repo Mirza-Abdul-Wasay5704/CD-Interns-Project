@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Manager - PSO Smart Trading Area</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    
+    <style>
+        .module-card {
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, rgba(31, 41, 55, 0.95), rgba(17, 24, 39, 0.95));
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(75, 85, 99, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .module-card.has-data {
+            border-color: rgba(34, 197, 94, 0.6);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
+        }
+        
+        .module-card.no-data {
+            border-color: rgba(239, 68, 68, 0.6);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
+        }
+        
+        .module-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+        
+        .module-card.has-data:hover {
+            box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.2);
+        }
+        
+        .module-card.no-data:hover {
+            box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.2);
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-green {
+            background: linear-gradient(45deg, #10b981, #059669);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+        }
+        
+        .status-red {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }
+        
+        .compact-stats {
+            font-size: 0.85rem;
+            line-height: 1.3;
+        }
+        
+        .module-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(75, 85, 99, 0.2);
+        }
+        
+        .module-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 1rem;
+        }
+        
+        .action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .export-btn-small {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+        
+        .export-btn-small:hover:not(:disabled) {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            transform: translateY(-1px);
+        }
+        
+        .export-btn-small:disabled {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .clear-btn-small {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+        
+        .clear-btn-small:hover:not(:disabled) {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            transform: translateY(-1px);
+        }
+        
+        .clear-btn-small:disabled {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .export-btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .export-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .export-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+        
+        .export-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .export-btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+        
+        /* Report Generation Styles */
+        .report-btn {
+            background: linear-gradient(135deg, #00AA44, #00DD55);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .report-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 170, 68, 0.3);
+        }
+        
+        .report-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+        
+        .report-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .report-btn:hover:not(:disabled)::before {
+            left: 100%;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(29, 78, 216, 0.1));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .glass-effect {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+        }
+        
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+        
+        .floating-action {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+            transition: all 0.3s ease;
+            z-index: 50;
+        }
+        
+        .floating-action:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 35px rgba(16, 185, 129, 0.6);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white">
+    <!-- Header -->
+    <header class="glass-effect border-b border-gray-600">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-database text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold gradient-text">Storage Manager</h1>
+                        <p class="text-gray-400 text-sm">PSO Smart Trading Area - Data Management Hub</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <div class="text-sm text-gray-400">Last Sync</div>
+                        <div class="text-sm font-medium" id="lastSyncTime">Loading...</div>
+                    </div>
+                    <button onclick="refreshData()" class="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Overview Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="stats-card rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-400">Total Modules</h3>
+                        <p class="text-2xl font-bold text-white" id="totalModules">3</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-cubes text-blue-400 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-card rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-400">Modules with Data</h3>
+                        <p class="text-2xl font-bold text-white" id="modulesWithData">0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-card rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-400">Total Data Size</h3>
+                        <p class="text-2xl font-bold text-white" id="totalDataSize">0 B</p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-hdd text-purple-400 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-card rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-400">Coordinate Sync</h3>
+                        <p class="text-lg font-bold" id="coordinateStatus">
+                            <span class="status-indicator status-red"></span>Unknown
+                        </p>
+                    </div>
+                    <div class="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-map-marker-alt text-yellow-400 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Map Module -->
+            <div class="module-card rounded-xl p-5" id="mapCard">
+                <div class="module-header">
+                    <div class="flex items-center space-x-3">
+                        <div class="module-icon bg-gradient-to-r from-blue-500 to-blue-600">
+                            <i class="fas fa-map text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold">Map Analysis</h3>
+                            <p class="text-gray-400 text-xs">Fuel Station Mapping</p>
+                        </div>
+                    </div>
+                    <div class="status-indicator status-red" id="mapStatus"></div>
+                </div>
+                
+                <div class="space-y-2 mb-4 compact-stats">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Stations:</span>
+                        <span class="font-medium" id="mapStations">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Updated:</span>
+                        <span class="font-medium text-xs" id="mapLastUpdated">Never</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Size:</span>
+                        <span class="font-medium" id="mapDataSize">0 B</span>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button onclick="exportModule('map')" 
+                            class="action-btn export-btn-small" 
+                            id="exportMapBtn" disabled>
+                        <i class="fas fa-download"></i>Export
+                    </button>
+                    <button onclick="clearModule('map')" 
+                            class="action-btn clear-btn-small"
+                            id="clearMapBtn" disabled>
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Analysis Module -->
+            <div class="module-card rounded-xl p-5" id="analysisCard">
+                <div class="module-header">
+                    <div class="flex items-center space-x-3">
+                        <div class="module-icon bg-gradient-to-r from-purple-500 to-purple-600">
+                            <i class="fas fa-chart-pie text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold">Land Use Analysis</h3>
+                            <p class="text-gray-400 text-xs">Commercial Viability</p>
+                        </div>
+                    </div>
+                    <div class="status-indicator status-red" id="analysisStatus"></div>
+                </div>
+                
+                <div class="space-y-2 mb-4 compact-stats">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Site Type:</span>
+                        <span class="font-medium" id="analysisSiteType">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Updated:</span>
+                        <span class="font-medium text-xs" id="analysisLastUpdated">Never</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Size:</span>
+                        <span class="font-medium" id="analysisDataSize">0 B</span>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button onclick="exportModule('analysis')" 
+                            class="action-btn export-btn-small" 
+                            id="exportAnalysisBtn" disabled>
+                        <i class="fas fa-download"></i>Export
+                    </button>
+                    <button onclick="clearModule('analysis')" 
+                            class="action-btn clear-btn-small"
+                            id="clearAnalysisBtn" disabled>
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SSM Module -->
+            <div class="module-card rounded-xl p-5" id="ssmCard">
+                <div class="module-header">
+                    <div class="flex items-center space-x-3">
+                        <div class="module-icon bg-gradient-to-r from-green-500 to-green-600">
+                            <i class="fas fa-bullseye text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold">Site Selection</h3>
+                            <p class="text-gray-400 text-xs">PSO Scoring Matrix</p>
+                        </div>
+                    </div>
+                    <div class="status-indicator status-red" id="ssmStatus"></div>
+                </div>
+                
+                <div class="space-y-2 mb-4 compact-stats">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Score:</span>
+                        <span class="font-medium" id="ssmScore">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Updated:</span>
+                        <span class="font-medium text-xs" id="ssmLastUpdated">Never</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Size:</span>
+                        <span class="font-medium" id="ssmDataSize">0 B</span>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button onclick="exportModule('ssm')" 
+                            class="action-btn export-btn-small" 
+                            id="exportSSMBtn" disabled>
+                        <i class="fas fa-download"></i>Export
+                    </button>
+                    <button onclick="clearModule('ssm')" 
+                            class="action-btn clear-btn-small"
+                            id="clearSSMBtn" disabled>
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div class="glass-effect rounded-xl p-5 mb-6">
+            <h3 class="text-lg font-bold mb-3 flex items-center">
+                <i class="fas fa-layer-group mr-2 text-blue-400"></i>
+                Bulk Actions
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <button onclick="showExportModal()" 
+                        class="export-btn px-4 py-2.5 rounded-lg text-white font-medium flex items-center justify-center space-x-2 text-sm">
+                    <i class="fas fa-download"></i>
+                    <span>Export Data</span>
+                </button>
+                
+                <button onclick="showImportModal()" 
+                        class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 rounded-lg text-white font-medium flex items-center justify-center space-x-2 transition-all text-sm">
+                    <i class="fas fa-upload"></i>
+                    <span>Import Data</span>
+                </button>
+                
+                <button onclick="generateReport()" 
+                        id="generateReportBtn"
+                        class="report-btn px-4 py-2.5 rounded-lg text-white font-medium flex items-center justify-center space-x-2 transition-all text-sm">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Generate Report</span>
+                </button>
+                
+                <button onclick="clearAllData()" 
+                        class="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-lg text-white font-medium flex items-center justify-center space-x-2 transition-all text-sm">
+                    <i class="fas fa-trash-alt"></i>
+                    <span>Clear All</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Data Integrity Check -->
+        <div class="glass-effect rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-lg font-bold flex items-center">
+                    <i class="fas fa-shield-alt mr-2 text-yellow-400"></i>
+                    Data Integrity
+                </h3>
+                <button onclick="validateData()" 
+                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-white font-medium transition-colors text-sm">
+                    <i class="fas fa-check-double mr-1"></i>Validate
+                </button>
+            </div>
+            <div id="integrityResults" class="text-gray-400 text-sm">
+                Click "Validate" to check data integrity across all modules.
+            </div>
+        </div>
+    </main>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+        <div class="glass-effect rounded-xl p-6 m-4 max-w-md w-full">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">Export Data</h3>
+                <button onclick="closeExportModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <p class="text-gray-400 mb-6">Select which modules to export:</p>
+            
+            <div class="space-y-3 mb-6">
+                <label class="flex items-center space-x-3">
+                    <input type="checkbox" id="exportAllCheck" class="w-4 h-4 text-blue-600 rounded" checked>
+                    <span>All Available Data</span>
+                </label>
+                <label class="flex items-center space-x-3">
+                    <input type="checkbox" id="exportMapCheck" class="w-4 h-4 text-blue-600 rounded">
+                    <span>Map Analysis Only</span>
+                </label>
+                <label class="flex items-center space-x-3">
+                    <input type="checkbox" id="exportAnalysisCheck" class="w-4 h-4 text-blue-600 rounded">
+                    <span>Land Use Analysis Only</span>
+                </label>
+                <label class="flex items-center space-x-3">
+                    <input type="checkbox" id="exportSSMCheck" class="w-4 h-4 text-blue-600 rounded">
+                    <span>Site Selection Only</span>
+                </label>
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="executeExport()" 
+                        class="export-btn flex-1 px-4 py-2 rounded-lg text-white font-medium">
+                    <i class="fas fa-download mr-2"></i>Export
+                </button>
+                <button onclick="closeExportModal()" 
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50">
+        <div class="glass-effect rounded-xl p-6 m-4 max-w-md w-full">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">Import Data</h3>
+                <button onclick="closeImportModal()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-400 mb-2">Select JSON File:</label>
+                <input type="file" id="importFile" accept=".json" 
+                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            
+            <div class="flex space-x-3">
+                <button onclick="executeImport()" 
+                        class="export-btn flex-1 px-4 py-2 rounded-lg text-white font-medium">
+                    <i class="fas fa-upload mr-2"></i>Import
+                </button>
+                <button onclick="closeImportModal()" 
+                        class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg text-white font-medium transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Action Button -->
+    <button onclick="refreshData()" class="floating-action flex items-center justify-center">
+        <i class="fas fa-sync-alt text-white text-xl pulse-animation"></i>
+    </button>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 border-t border-gray-700 mt-12">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between text-sm text-gray-400">
+                <div>© 2024 PSO Smart Trading Area - Storage Management System</div>
+                <div class="flex items-center space-x-4">
+                    <span>Version 1.0</span>
+                    <span>•</span>
+                    <a href="#" class="hover:text-white transition-colors">Documentation</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Load Scripts -->
+    <script src="storage-manager.js"></script>
+    <script>
+        // Global storage manager instance
+        let storageManager;
+        
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            const bgColors = {
+                success: 'linear-gradient(to right, #059669, #047857)',
+                error: 'linear-gradient(to right, #dc2626, #b91c1c)',
+                warning: 'linear-gradient(to right, #d97706, #b45309)',
+                info: 'linear-gradient(to right, #2563eb, #1d4ed8)'
+            };
+
+            Toastify({
+                text: message,
+                duration: 3000,
+                gravity: "top",
+                position: "right",
+                offset: { y: 80 },
+                style: {
+                    background: bgColors[type] || bgColors.success,
+                },
+                stopOnFocus: true
+            }).showToast();
+        }
+
+        // Format file size
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            if (!dateString || dateString === 'Never') return 'Never';
+            return new Date(dateString).toLocaleString();
+        }
+
+        // Update display with current data
+        function updateDisplay() {
+            const summary = storageManager.getDataSummary();
+            const coordinateCheck = storageManager.checkCoordinateConsistency();
+
+            // Update overview stats with null checks
+            const totalModulesElement = document.getElementById('totalModules');
+            if (totalModulesElement) {
+                totalModulesElement.textContent = summary.summary.totalModules;
+            }
+            
+            const modulesWithDataElement = document.getElementById('modulesWithData');
+            if (modulesWithDataElement) {
+                modulesWithDataElement.textContent = summary.summary.modulesWithData;
+            }
+            
+            const totalDataSizeElement = document.getElementById('totalDataSize');
+            if (totalDataSizeElement) {
+                totalDataSizeElement.textContent = formatBytes(summary.summary.totalDataSize);
+            }
+            
+            // Update coordinate status with null check
+            const coordStatus = document.getElementById('coordinateStatus');
+            if (coordStatus) {
+                if (coordinateCheck.isConsistent) {
+                    coordStatus.innerHTML = '<span class="status-indicator status-green"></span>Synced';
+                } else {
+                    coordStatus.innerHTML = '<span class="status-indicator status-red"></span>Inconsistent';
+                }
+            }
+
+            // Update last sync time with null check
+            const lastActivity = summary.summary.lastActivity;
+            const lastSyncTimeElement = document.getElementById('lastSyncTime');
+            if (lastSyncTimeElement) {
+                lastSyncTimeElement.textContent = 
+                    lastActivity !== 'Never' ? formatDate(lastActivity) : 'Never';
+            }
+
+            // Update module cards
+            updateModuleCard('map', summary.modules.map);
+            updateModuleCard('analysis', summary.modules.analysis);
+            updateModuleCard('ssm', summary.modules.ssm);
+            
+            // Update Generate Report button based on data availability
+            const generateReportBtn = document.getElementById('generateReportBtn');
+            if (generateReportBtn) {
+                const hasAllData = summary.modules.map.hasData && 
+                                   summary.modules.analysis.hasData && 
+                                   summary.modules.ssm.hasData &&
+                                   coordinateCheck.isConsistent;
+                
+                generateReportBtn.disabled = !hasAllData;
+                
+                if (hasAllData) {
+                    generateReportBtn.title = 'Generate comprehensive PDF report';
+                } else {
+                    generateReportBtn.title = 'Complete all analyses (Map, Land Use, SSM) with consistent coordinates to generate report';
+                }
+            }
+        }
+
+        // Update individual module card
+        function updateModuleCard(module, data) {
+            const statusElement = document.getElementById(`${module}Status`);
+            const moduleCard = document.getElementById(`${module}Card`);
+            
+            // Handle SSM capitalization correctly
+            const moduleCapitalized = module === 'ssm' ? 'SSM' : module.charAt(0).toUpperCase() + module.slice(1);
+            const exportBtn = document.getElementById(`export${moduleCapitalized}Btn`);
+            const clearBtn = document.getElementById(`clear${moduleCapitalized}Btn`);
+
+            // Update module card styling based on data availability
+            if (moduleCard) {
+                if (data.hasData) {
+                    moduleCard.classList.remove('no-data');
+                    moduleCard.classList.add('has-data');
+                } else {
+                    moduleCard.classList.remove('has-data');
+                    moduleCard.classList.add('no-data');
+                }
+            }
+
+            // Update status indicator with null check
+            if (statusElement) {
+                if (data.hasData) {
+                    statusElement.className = 'status-indicator status-green';
+                } else {
+                    statusElement.className = 'status-indicator status-red';
+                }
+            }
+            
+            // Update export and clear buttons with null checks
+            if (exportBtn) {
+                exportBtn.disabled = !data.hasData;
+            }
+            if (clearBtn) {
+                clearBtn.disabled = !data.hasData;
+            }
+
+            // Update module-specific data with null checks
+            if (module === 'map') {
+                const mapStationsElement = document.getElementById('mapStations');
+                if (mapStationsElement) {
+                    mapStationsElement.textContent = data.stationCount || '-';
+                }
+            } else if (module === 'analysis') {
+                const analysisSiteTypeElement = document.getElementById('analysisSiteType');
+                if (analysisSiteTypeElement) {
+                    analysisSiteTypeElement.textContent = data.siteType || '-';
+                }
+            } else if (module === 'ssm') {
+                const ssmScoreElement = document.getElementById('ssmScore');
+                if (ssmScoreElement) {
+                    ssmScoreElement.textContent = data.overallScore || '-';
+                }
+            }
+
+            // Update last updated and data size with null checks
+            const lastUpdatedElement = document.getElementById(`${module}LastUpdated`);
+            if (lastUpdatedElement) {
+                lastUpdatedElement.textContent = formatDate(data.lastUpdated);
+            }
+            
+            const dataSizeElement = document.getElementById(`${module}DataSize`);
+            if (dataSizeElement) {
+                dataSizeElement.textContent = formatBytes(data.dataSize);
+            }
+        }
+
+        // Export single module
+        function exportModule(module) {
+            try {
+                const data = storageManager.exportData(module);
+                if (data) {
+                    downloadJSON(data, `${module}-data-${new Date().toISOString().split('T')[0]}.json`);
+                    showToast(`${module.charAt(0).toUpperCase() + module.slice(1)} data exported successfully`, 'success');
+                } else {
+                    showToast(`No data available for ${module}`, 'warning');
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                showToast('Error exporting data', 'error');
+            }
+        }
+
+        // Clear single module
+        function clearModule(module) {
+            if (confirm(`Are you sure you want to clear ${module} data? This cannot be undone.`)) {
+                if (storageManager.clearData(module)) {
+                    showToast(`${module.charAt(0).toUpperCase() + module.slice(1)} data cleared`, 'success');
+                    updateDisplay();
+                } else {
+                    showToast('Error clearing data', 'error');
+                }
+            }
+        }
+
+        // Show export modal
+        function showExportModal() {
+            document.getElementById('exportModal').classList.remove('hidden');
+            document.getElementById('exportModal').classList.add('flex');
+        }
+
+        // Close export modal
+        function closeExportModal() {
+            document.getElementById('exportModal').classList.add('hidden');
+            document.getElementById('exportModal').classList.remove('flex');
+        }
+
+        // Execute export based on selection
+        function executeExport() {
+            const exportAll = document.getElementById('exportAllCheck').checked;
+            const exportMap = document.getElementById('exportMapCheck').checked;
+            const exportAnalysis = document.getElementById('exportAnalysisCheck').checked;
+            const exportSSM = document.getElementById('exportSSMCheck').checked;
+
+            try {
+                let data;
+                let filename;
+
+                if (exportAll) {
+                    data = storageManager.exportData('all');
+                    filename = `all-data-${new Date().toISOString().split('T')[0]}.json`;
+                } else {
+                    const modules = [];
+                    if (exportMap) modules.push('map');
+                    if (exportAnalysis) modules.push('analysis');
+                    if (exportSSM) modules.push('ssm');
+
+                    if (modules.length === 0) {
+                        showToast('Please select at least one module to export', 'warning');
+                        return;
+                    }
+
+                    data = storageManager.exportData(modules);
+                    filename = `selected-data-${new Date().toISOString().split('T')[0]}.json`;
+                }
+
+                if (data) {
+                    downloadJSON(data, filename);
+                    showToast('Data exported successfully', 'success');
+                    closeExportModal();
+                } else {
+                    showToast('No data available to export', 'warning');
+                }
+            } catch (error) {
+                console.error('Export error:', error);
+                showToast('Error exporting data', 'error');
+            }
+        }
+
+        // Show import modal
+        function showImportModal() {
+            document.getElementById('importModal').classList.remove('hidden');
+            document.getElementById('importModal').classList.add('flex');
+        }
+
+        // Close import modal
+        function closeImportModal() {
+            document.getElementById('importModal').classList.add('hidden');
+            document.getElementById('importModal').classList.remove('flex');
+            document.getElementById('importFile').value = '';
+        }
+
+        // Execute import
+        function executeImport() {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showToast('Please select a JSON file', 'warning');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const jsonData = e.target.result;
+                    const importedCount = storageManager.importData(jsonData);
+                    
+                    if (importedCount > 0) {
+                        showToast(`Successfully imported data for ${importedCount} module(s)`, 'success');
+                        updateDisplay();
+                        closeImportModal();
+                    } else {
+                        showToast('No valid data found in the file', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Import error:', error);
+                    showToast('Error importing data. Please check the file format.', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('Are you sure you want to clear ALL data? This cannot be undone.')) {
+                if (storageManager.clearData('all')) {
+                    showToast('All data cleared successfully', 'success');
+                    updateDisplay();
+                } else {
+                    showToast('Error clearing data', 'error');
+                }
+            }
+        }
+
+        // Validate data integrity
+        function validateData() {
+            const validation = storageManager.validateDataIntegrity();
+            const resultsDiv = document.getElementById('integrityResults');
+            
+            if (validation.isValid) {
+                resultsDiv.innerHTML = '<div class="text-green-400"><i class="fas fa-check-circle mr-2"></i>All data is valid and consistent</div>';
+            } else {
+                resultsDiv.innerHTML = `
+                    <div class="text-red-400">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>Data integrity issues found:
+                        <ul class="mt-2 ml-4 space-y-1">
+                            ${validation.issues.map(issue => `<li>• ${issue}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+        }
+
+        // Download JSON file
+        function downloadJSON(data, filename) {
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Refresh data display
+        function refreshData() {
+            updateDisplay();
+            showToast('Data refreshed', 'info');
+        }
+
+        // Generate comprehensive PDF report
+        async function generateReport() {
+            try {
+                // Disable button during generation
+                const btn = document.getElementById('generateReportBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Generating...</span>';
+                }
+
+                // Call the storage manager's generateReport function
+                const pdfBlob = await storageManager.generateReport();
+                
+                showToast('Report generated successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Report generation error:', error);
+                showToast(`Report generation failed: ${error.message}`, 'error');
+            } finally {
+                // Re-enable button
+                const btn = document.getElementById('generateReportBtn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-file-pdf"></i><span>Generate Report</span>';
+                }
+            }
+        }
+
+        // Handle checkbox logic in export modal
+        document.addEventListener('change', function(e) {
+            if (e.target.id === 'exportAllCheck') {
+                const otherCheckboxes = ['exportMapCheck', 'exportAnalysisCheck', 'exportSSMCheck'];
+                otherCheckboxes.forEach(id => {
+                    document.getElementById(id).checked = false;
+                });
+            } else if (['exportMapCheck', 'exportAnalysisCheck', 'exportSSMCheck'].includes(e.target.id)) {
+                document.getElementById('exportAllCheck').checked = false;
+            }
+        });
+
+        // Initialize display when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🏪 Storage Manager page loaded');
+            
+            // Initialize storage manager instance
+            storageManager = window.storageManager;
+            
+            // Initial display update
+            updateDisplay();
+        });
+
+        // Auto-refresh display when storage is updated
+        window.addEventListener('storageUpdated', function(event) {
+            console.log(`📢 Storage updated for ${event.detail.module} module`);
+            updateDisplay();
+            
+            // Show brief notification for successful data updates
+            if (event.detail.module) {
+                const moduleName = event.detail.module.charAt(0).toUpperCase() + event.detail.module.slice(1);
+                showToast(`${moduleName} data updated`, 'info');
+            }
+        });
+
+        // Handle keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'e':
+                        e.preventDefault();
+                        showExportModal();
+                        break;
+                    case 'i':
+                        e.preventDefault();
+                        showImportModal();
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        refreshData();
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

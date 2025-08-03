@@ -3,41 +3,99 @@ let map;
 let landUseChart;
 let currentAnalysisData = {};
 
-// Initialize the map
+// Global variables to track map markers and circles
+let currentMarker = null;
+let currentCircle = null;
+
+// Global storage for polygon data
+window.currentPolygonData = {};
+
+// Toggle states for map elements
+let amenityMarkersVisible = true;
+let centerMarkerVisible = true;
+let amenityMarkersGroup = null;
+
+
+function initAnalysisMap() {
+    // Default coordinates for Karachi, Pakistan
+    const lat = 24.8607; // Karachi latitude
+    const lng = 67.0011; // Karachi longitude
+    
+    // Make sure the map container exists
+    const mapContainer = document.getElementById('analysisMap');
+    if (!mapContainer) {
+        console.error('Map container not found!');
+        return;
+    }
+    
+    // Check if map is already initialized
+    if (map) {
+        console.log('Map already exists, removing...');
+        map.remove();
+        map = null;
+    }
+    
+    try {
+        map = L.map('analysisMap').setView([lat, lng], 13);
+        console.log('Analysis map initialized at:', { lat, lng });
+        
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Set default coordinates in input fields
+        if (document.getElementById('latitude')) {
+            document.getElementById('latitude').value = lat;
+        }
+        if (document.getElementById('longitude')) {
+            document.getElementById('longitude').value = lng;
+        }
+        
+        // Clear any existing markers/circles
+        currentMarker = null;
+        currentCircle = null;
+        
+        console.log('Map initialization successful');
+        
+    } catch (error) {
+        console.error('Error initializing map:', error);
+    }
+}
+
+// Fallback function for compatibility
 function initMap() {
-    // const lat = parseFloat(document.getElementById('latitude').value);
-    // const lng = parseFloat(document.getElementById('longitude').value);
-    const lat = getCookie('map_latitude') || 24.8607; // Default to Islamabad
-    const lng = getCookie('map_longitude') || 67.0011; // Default to Islamabad
-    
-    map = L.map('analysisMap').setView([lat, lng], 13);
-    console.log('Map initialized at:', { lat, lng });
-    // Add OpenStreetMap tile layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19
-    }).addTo(map);
-    
-    // Add a marker for the center point
-    L.marker([lat, lng]).addTo(map)
-        .bindPopup('Analysis Center Point')
-        .openPopup();
-    
-    // Add initial radius circle
-    const radius = parseFloat(document.getElementById('radius').value) * 1000; // Convert to meters
-    L.circle([lat, lng], {
-        radius: radius,
-        color: '#3b82f6',
-        fillColor: '#3b82f6',
-        fillOpacity: 0.1,
-        weight: 2
-    }).addTo(map);
+    initAnalysisMap();
+}
+
+// Initialize elements (placeholder for compatibility)
+function initElement() {
+    console.log('initElement called - placeholder function');
 }
 
 // Initialize Chart.js pie chart
 function initChart() {
-    const ctx = document.getElementById('landUseChart').getContext('2d');
-    landUseChart = new Chart(ctx, {
+    try {
+        // Destroy existing chart if it exists
+        if (landUseChart) {
+            landUseChart.destroy();
+            landUseChart = null;
+        }
+        
+        const canvasElement = document.getElementById('landUseChart');
+        if (!canvasElement) {
+            console.error('Chart canvas not found!');
+            return;
+        }
+        
+        // Clear any existing chart instance on this canvas
+        const existingChart = Chart.getChart(canvasElement);
+        if (existingChart) {
+            existingChart.destroy();
+        }
+        
+        landUseChart = new Chart(canvasElement, {
         type: 'doughnut',
         data: {
             labels: ['Residential', 'Commercial', 'Industrial', 'Other'],
@@ -88,6 +146,10 @@ function initChart() {
             }
         }
     });
+    
+    } catch (error) {
+        console.error('Error initializing chart:', error);
+    }
 }
 
 // Overpass API query builder
@@ -390,37 +452,195 @@ function determineDominantLandUse(analysis) {
     return 'Mixed Use';
 }
 
+// Add function to recreate land use polygons from stored data
+function recreateLandUsePolygons(polygonData, areaData) {
+    try {
+        if (!polygonData || !areaData) {
+            console.log('❌ No polygon data to recreate');
+            return;
+        }
+        
+        console.log('🔄 Recreating land use polygons...', polygonData);
+        
+        // Clear existing polygons
+        if (window.landUseLayerGroup) {
+            analysisMap.removeLayer(window.landUseLayerGroup);
+        }
+        
+        // Create new layer group
+        window.landUseLayerGroup = L.layerGroup().addTo(analysisMap);
+        
+        // Define land use colors
+        const landUseColors = {
+            'Residential': '#ffcccb',
+            'Commercial': '#add8e6', 
+            'Industrial': '#d3d3d3',
+            'Educational': '#98fb98',
+            'Healthcare': '#f0e68c',
+            'Recreational': '#dda0dd',
+            'Mixed Use': '#ffd700',
+            'Open Space': '#90ee90',
+            'Other': '#e6e6fa'
+        };
+        
+        // Process each land use type
+        Object.keys(polygonData).forEach(landUseType => {
+            const polygons = polygonData[landUseType];
+            const color = landUseColors[landUseType] || '#e6e6fa';
+            
+            if (Array.isArray(polygons)) {
+                polygons.forEach(polygon => {
+                    if (polygon && polygon.coordinates && polygon.coordinates.length > 0) {
+                        try {
+                            // Convert coordinates to Leaflet format
+                            const latLngs = polygon.coordinates.map(coord => [coord[1], coord[0]]);
+                            
+                            // Create polygon
+                            const leafletPolygon = L.polygon(latLngs, {
+                                color: color,
+                                fillColor: color,
+                                fillOpacity: 0.6,
+                                weight: 2
+                            });
+                            
+                            // Add popup with land use info
+                            leafletPolygon.bindPopup(`
+                                <div class="popup-content">
+                                    <h4>🏗️ ${landUseType}</h4>
+                                    <p><strong>Area:</strong> ${polygon.area || 'N/A'} sq meters</p>
+                                    <p><strong>Percentage:</strong> ${(polygon.percentage || 0).toFixed(1)}%</p>
+                                </div>
+                            `);
+                            
+                            // Add to layer group
+                            window.landUseLayerGroup.addLayer(leafletPolygon);
+                            
+                        } catch (err) {
+                            console.error('Error creating polygon for', landUseType, err);
+                        }
+                    }
+                });
+            }
+        });
+        
+        console.log('✅ Land use polygons recreated successfully');
+        
+    } catch (error) {
+        console.error('❌ Error recreating land use polygons:', error);
+    }
+}
+
+// Function to update population map radius
+function updatePopulationRadius(lat, lng, radius) {
+    try {
+        // Update the radius input if it exists
+        const radiusInput = document.querySelector('input[placeholder="Radius in meters"]');
+        if (radiusInput) {
+            radiusInput.value = radius;
+        }
+        
+        // Trigger population map update if the function exists
+        if (typeof window.updatePopulationMap === 'function') {
+            window.updatePopulationMap(lat, lng, radius);
+        } else if (typeof updatePopulationMap === 'function') {
+            updatePopulationMap(lat, lng, radius);
+        }
+        
+        console.log('✅ Population radius updated to', radius, 'meters');
+        
+    } catch (error) {
+        console.error('❌ Error updating population radius:', error);
+    }
+}
+
+// Make update function globally available
+window.updatePopulationRadius = updatePopulationRadius;
+
+// Helper function to determine land use type from tags
+function determineLandUseType(tags) {
+    if (tags.landuse) {
+        const landuse = tags.landuse.toLowerCase();
+        if (landuse.includes('residential')) return 'Residential';
+        if (landuse.includes('commercial') || landuse.includes('retail')) return 'Commercial';
+        if (landuse.includes('industrial')) return 'Industrial';
+        if (landuse.includes('education') || landuse.includes('school')) return 'Educational';
+        if (landuse.includes('health') || landuse.includes('hospital')) return 'Healthcare';
+        if (landuse.includes('recreation') || landuse.includes('park')) return 'Recreational';
+        if (landuse.includes('mixed')) return 'Mixed Use';
+        if (landuse.includes('green') || landuse.includes('forest')) return 'Open Space';
+    }
+    
+    if (tags.building) {
+        const building = tags.building.toLowerCase();
+        if (building.includes('residential') || building.includes('house') || building.includes('apartment')) return 'Residential';
+        if (building.includes('commercial') || building.includes('office') || building.includes('retail')) return 'Commercial';
+        if (building.includes('industrial') || building.includes('warehouse')) return 'Industrial';
+        if (building.includes('school') || building.includes('university')) return 'Educational';
+        if (building.includes('hospital') || building.includes('clinic')) return 'Healthcare';
+    }
+    
+    if (tags.amenity) {
+        const amenity = tags.amenity.toLowerCase();
+        if (amenity.includes('school') || amenity.includes('university')) return 'Educational';
+        if (amenity.includes('hospital') || amenity.includes('clinic')) return 'Healthcare';
+        if (amenity.includes('park') || amenity.includes('playground')) return 'Recreational';
+        if (amenity.includes('shop') || amenity.includes('mall')) return 'Commercial';
+    }
+    
+    return 'Other';
+}
+
 // Add land use polygons to map with area calculation
 function addLandUseToMap(data) {
-    // Clear existing layers except base layers
+    // Clear existing layers (polygons, polylines, but preserve amenity markers)
     map.eachLayer(layer => {
-        if (layer instanceof L.Polygon || layer instanceof L.Polyline) {
+        if (layer instanceof L.Polygon || 
+            layer instanceof L.Polyline || 
+            (layer instanceof L.Marker && !layer.options.keepOnRefresh) || 
+            (layer instanceof L.Circle && !layer.options.keepOnRefresh)) {
             map.removeLayer(layer);
         }
     });
     
-    // Re-add center marker and circle
+    // Clear our tracked markers and circles
+    currentMarker = null;
+    currentCircle = null;
+    
+    // Clear polygon data for fresh analysis
+    window.currentPolygonData = {};
+    
+    // Get coordinates from input fields
     const lat = parseFloat(document.getElementById('latitude').value);
     const lng = parseFloat(document.getElementById('longitude').value);
-    const radius = parseFloat(document.getElementById('radius').value) * 1000;
+    const radius = parseFloat(document.getElementById('radius').value) * 1000; // Convert to meters
     
-    L.marker([lat, lng], {
+    // Add blue center marker
+    currentMarker = L.marker([lat, lng], {
         icon: L.divIcon({
             className: 'custom-marker',
-            html: '<div style="background: #f59e0b; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.3);"></div>',
+            html: '<div style="background: #3b82f6; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.3);"></div>',
             iconSize: [20, 20],
             iconAnchor: [10, 10]
         })
     }).addTo(map).bindPopup('Analysis Center Point');
     
-    const analysisCircle = L.circle([lat, lng], {
+    // Add analysis circle with blue color
+    currentCircle = L.circle([lat, lng], {
         radius: radius,
-        color: '#f59e0b',
+        color: '#3b82f6',
         fillColor: 'transparent',
         fillOpacity: 0,
         weight: 3,
         dashArray: '10, 10'
     }).addTo(map);
+    
+    // Ensure center marker toggle is visible
+    centerMarkerVisible = true;
+    const centerToggleBtn = document.getElementById('centerToggleBtn');
+    if (centerToggleBtn) {
+        centerToggleBtn.style.opacity = '1';
+        centerToggleBtn.title = 'Hide Center Marker & Radius';
+    }
     
     // Create analysis circle as turf polygon for clipping
     const center = turf.point([lng, lat]);
@@ -514,6 +734,18 @@ function addLandUseToMap(data) {
                             leafletCoords = polyCoords[0].map(coord => [coord[1], coord[0]]);
                             
                             if (leafletCoords.length > 2) {
+                                // Store polygon data for recreation
+                                const landUseType = determineLandUseType(tags);
+                                if (!window.currentPolygonData[landUseType]) {
+                                    window.currentPolygonData[landUseType] = [];
+                                }
+                                window.currentPolygonData[landUseType].push({
+                                    coordinates: polyCoords[0],
+                                    area: area,
+                                    percentage: (area / (Math.PI * Math.pow(radius, 2))) * 100,
+                                    tags: tags
+                                });
+                                
                                 L.polygon(leafletCoords, {
                                     color: color,
                                     fillColor: fillColor,
@@ -534,6 +766,18 @@ function addLandUseToMap(data) {
                     }
                     
                     if (leafletCoords && leafletCoords.length > 2) {
+                        // Store polygon data for recreation
+                        const landUseType = determineLandUseType(tags);
+                        if (!window.currentPolygonData[landUseType]) {
+                            window.currentPolygonData[landUseType] = [];
+                        }
+                        window.currentPolygonData[landUseType].push({
+                            coordinates: coordinates.map(coord => [coord.lng, coord.lat]),
+                            area: area,
+                            percentage: (area / (Math.PI * Math.pow(radius, 2))) * 100,
+                            tags: tags
+                        });
+                        
                         L.polygon(leafletCoords, {
                             color: color,
                             fillColor: fillColor,
@@ -617,13 +861,14 @@ function updateUI(analysis, areaAnalysis = null) {
     
     const total = chartData.residential + chartData.commercial + chartData.industrial + chartData.other;
     
-    if (total > 0) {
+    if (total > 0 && landUseChart) {
         // Convert to percentages for better visualization
         const residentialPercent = (chartData.residential / total) * 100;
         const commercialPercent = (chartData.commercial / total) * 100;
         const industrialPercent = (chartData.industrial / total) * 100;
         const otherPercent = (chartData.other / total) * 100;
         
+        // Update chart data
         landUseChart.data.datasets[0].data = [
             residentialPercent,
             commercialPercent,
@@ -646,24 +891,44 @@ function updateUI(analysis, areaAnalysis = null) {
             '#4b5563'  // Dark gray border
         ];
         
-        landUseChart.update();
+        // Force chart update
+        landUseChart.update('active');
         
-        // Update legend with percentages
-        if (areaAnalysis) {
-            const totalArea = total / 1000000; // Convert to km²
+        // Update legend with percentages if area data is available
+        if (areaAnalysis && typeof chartData.residential === 'number' && chartData.residential > 1000) {
+            // This looks like area data (square meters), show area info
             document.getElementById('residentialCount').textContent = 
                 `${residentialPercent.toFixed(1)}% (${(chartData.residential/1000000).toFixed(2)} km²)`;
             document.getElementById('commercialCount').textContent = 
                 `${commercialPercent.toFixed(1)}% (${(chartData.commercial/1000000).toFixed(2)} km²)`;
             document.getElementById('industrialCount').textContent = 
                 `${industrialPercent.toFixed(1)}% (${(chartData.industrial/1000000).toFixed(2)} km²)`;
+        } else {
+            // This looks like count data, just show the counts
+            document.getElementById('residentialCount').textContent = analysis.residential || 0;
+            document.getElementById('commercialCount').textContent = analysis.commercial || 0;
+            document.getElementById('industrialCount').textContent = analysis.industrial || 0;
         }
+        
+        console.log('Chart updated with data:', {
+            residential: residentialPercent.toFixed(1) + '%',
+            commercial: commercialPercent.toFixed(1) + '%',
+            industrial: industrialPercent.toFixed(1) + '%',
+            other: otherPercent.toFixed(1) + '%'
+        });
+    } else if (!landUseChart) {
+        console.error('Chart not initialized when trying to update');
+    } else {
+        console.warn('No data to display in chart, total:', total);
     }
 }
 
 // Function to update tooltip content with amenity details
 function updateTooltipContent() {
     const amenityDetails = window.currentAmenityDetails || {};
+    
+    // Add pinpoint markers for all amenities
+    addAmenityMarkers(amenityDetails);
     
     // Update Universities tooltip
     updateAmenityTooltip('universities', amenityDetails.universities || [], (item) => `
@@ -714,6 +979,129 @@ function updateTooltipContent() {
             ${item.phone ? `<div class="tooltip-item-phone text-gray-400">${item.phone}</div>` : ''}
         </div>
     `);
+}
+
+// Add pinpoint markers for amenities
+function addAmenityMarkers(amenityDetails) {
+    if (!map || !amenityDetails) return;
+    
+    // Clear existing amenity markers
+    if (amenityMarkersGroup) {
+        map.removeLayer(amenityMarkersGroup);
+    }
+    
+    // Create new layer group for amenity markers
+    amenityMarkersGroup = L.layerGroup();
+    
+    // Define marker styles for different amenity types
+    const markerStyles = {
+        universities: { color: '#3b82f6', icon: '🎓', size: 15 },
+        schools: { color: '#10b981', icon: '🏫', size: 12 },
+        malls: { color: '#8b5cf6', icon: '🏪', size: 13 },
+        fuelStations: { color: '#f59e0b', icon: '⛽', size: 12 },
+        restaurants: { color: '#ef4444', icon: '🍽️', size: 11 }
+    };
+    
+    // Add markers for each amenity type
+    Object.entries(amenityDetails).forEach(([type, amenities]) => {
+        if (!amenities || !Array.isArray(amenities)) return;
+        
+        const style = markerStyles[type];
+        if (!style) return;
+        
+        amenities.forEach(amenity => {
+            if (amenity.coordinates && amenity.coordinates.lat && amenity.coordinates.lng) {
+                const marker = L.marker([amenity.coordinates.lat, amenity.coordinates.lng], {
+                    keepOnRefresh: true, // Mark to preserve during map refresh
+                    icon: L.divIcon({
+                        className: 'amenity-marker',
+                        html: `<div style="
+                            background: ${style.color}; 
+                            color: white; 
+                            width: ${style.size + 6}px; 
+                            height: ${style.size + 6}px; 
+                            border-radius: 50%; 
+                            border: 2px solid white; 
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: ${style.size - 2}px;
+                            font-weight: bold;
+                        ">${style.icon}</div>`,
+                        iconSize: [style.size + 6, style.size + 6],
+                        iconAnchor: [(style.size + 6) / 2, (style.size + 6) / 2]
+                    })
+                });
+                
+                // Create detailed popup content
+                let popupContent = `<div class="amenity-popup">
+                    <div class="amenity-popup-title" style="font-weight: bold; color: ${style.color}; margin-bottom: 5px;">
+                        ${style.icon} ${amenity.name}
+                    </div>`;
+                
+                if (amenity.type || amenity.brand || amenity.operator) {
+                    popupContent += `<div class="amenity-popup-type" style="color: #666; font-size: 12px; margin-bottom: 3px;">
+                        ${amenity.type || amenity.brand || amenity.operator}
+                    </div>`;
+                }
+                
+                if (amenity.address) {
+                    popupContent += `<div class="amenity-popup-address" style="color: #888; font-size: 11px; margin-bottom: 3px;">
+                        📍 ${amenity.address}
+                    </div>`;
+                }
+                
+                if (amenity.cuisine) {
+                    popupContent += `<div class="amenity-popup-cuisine" style="color: #888; font-size: 11px; margin-bottom: 3px;">
+                        🍴 ${amenity.cuisine}
+                    </div>`;
+                }
+                
+                if (amenity.opening_hours) {
+                    popupContent += `<div class="amenity-popup-hours" style="color: #888; font-size: 11px; margin-bottom: 3px;">
+                        🕒 ${amenity.opening_hours}
+                    </div>`;
+                }
+                
+                if (amenity.phone) {
+                    popupContent += `<div class="amenity-popup-phone" style="color: #888; font-size: 11px; margin-bottom: 3px;">
+                        📞 ${amenity.phone}
+                    </div>`;
+                }
+                
+                if (amenity.website) {
+                    popupContent += `<div class="amenity-popup-website" style="margin-top: 5px;">
+                        <a href="${amenity.website}" target="_blank" style="color: ${style.color}; font-size: 11px; text-decoration: none;">
+                            🌐 Visit Website
+                        </a>
+                    </div>`;
+                }
+                
+                popupContent += `</div>`;
+                
+                marker.bindPopup(popupContent, {
+                    maxWidth: 250,
+                    className: 'amenity-popup-container'
+                });
+                
+                // Add marker to group
+                amenityMarkersGroup.addLayer(marker);
+            }
+        });
+    });
+    
+    // Add group to map if amenity markers should be visible
+    if (amenityMarkersVisible) {
+        amenityMarkersGroup.addTo(map);
+    }
+    
+    // Update amenity toggle button state
+    const amenityToggleBtn = document.getElementById('amenityToggleBtn');
+    if (amenityToggleBtn) {
+        amenityToggleBtn.style.opacity = amenityMarkersVisible ? '1' : '0.5';
+        amenityToggleBtn.title = amenityMarkersVisible ? 'Hide Amenity Markers' : 'Show Amenity Markers';
+    }
 }
 
 // Helper function to update individual amenity tooltip
@@ -840,6 +1228,11 @@ function loadCoordinatesFromCookies() {
         document.getElementById('longitude').value = savedLng;
         document.getElementById('radius').value = savedRadius;
         
+        // Update map view to saved coordinates
+        if (map) {
+            map.setView([parseFloat(savedLat), parseFloat(savedLng)], 13);
+        }
+        
         console.log('Coordinates loaded from cookies:', { 
             lat: savedLat, 
             lng: savedLng, 
@@ -858,7 +1251,12 @@ function loadCoordinatesFromCookies() {
             className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
             stopOnFocus: true
         }).showToast();
-        }
+    } else {
+        // Set default Karachi coordinates if no cookies found
+        document.getElementById('latitude').value = 24.8607;
+        document.getElementById('longitude').value = 67.0011;
+        document.getElementById('radius').value = 2; // Default radius
+    }
 }
 
 async function startAnalysis() {
@@ -877,9 +1275,17 @@ async function startAnalysis() {
         return;
     }
     
+    // Save coordinates to cookies
+    setCookie('map_latitude', lat, 30);
+    setCookie('map_longitude', lng, 30);
+    setCookie('map_radius', radius, 30);
+    
     showLoading();
     
     try {
+        // Update map view to new coordinates
+        map.setView([lat, lng], 13);
+        
         // Build and execute Overpass query for land use analysis only
         const query = buildOverpassQuery(lat, lng, radius);
         console.log('Executing Overpass query for land use...');
@@ -898,8 +1304,8 @@ async function startAnalysis() {
         // Store current analysis
         currentAnalysisData = { data, analysis, areaAnalysis, lat, lng, radius };
         
-        // Update map with new center and radius
-        map.setView([lat, lng], 13);
+        // Save analysis data to storage manager
+        saveAnalysisDataToStorage(lat, lng, radius, analysis, areaAnalysis, data);
         
         // Update UI with land use data only (amenities handled by HTML)
         updateUI(analysis, areaAnalysis);
@@ -918,68 +1324,417 @@ async function startAnalysis() {
     }
 }
 
+// Save analysis data to storage manager
+function saveAnalysisDataToStorage(lat, lng, radius, analysis, areaAnalysis, rawData) {
+    try {
+        // Calculate land use percentages from area analysis
+        const totalArea = Object.values(areaAnalysis || {}).reduce((sum, area) => sum + area, 0);
+        const landUsePercentages = {};
+        const landUseCounts = {
+            residential: analysis.residential || 0,
+            commercial: analysis.commercial || 0,
+            industrial: analysis.industrial || 0,
+            other: analysis.other || 0
+        };
+        const landUseAreas = areaAnalysis || {};
+        
+        if (totalArea > 0) {
+            Object.keys(landUseAreas).forEach(landUse => {
+                landUsePercentages[landUse] = ((landUseAreas[landUse] / totalArea) * 100).toFixed(2);
+            });
+        }
+
+        // Calculate total amenity counts
+        const totalAmenities = Object.values(analysis.amenities || {}).reduce((sum, count) => sum + count, 0);
+        
+        // Calculate total road infrastructure
+        const totalRoads = Object.values(analysis.roads || {}).reduce((sum, count) => sum + count, 0);
+
+        const analysisData = {
+            // Basic search parameters
+            searchCoordinates: {
+                latitude: lat,
+                longitude: lng,
+                radius: radius
+            },
+            
+            // Derived classifications
+            siteType: determineSiteType(analysis),
+            dominantLandUse: determineDominantLandUse(analysis),
+            
+            // Complete element count
+            totalElements: rawData?.elements?.length || 0,
+            
+            // Coordinates for reference
+            coordinates: {
+                center: { lat, lng },
+                radius: radius,
+                analysisArea: Math.PI * Math.pow(radius * 1000, 2) // in square meters
+            },
+            
+            // Comprehensive land use data
+            landUse: {
+                counts: landUseCounts,
+                areas: landUseAreas,
+                percentages: landUsePercentages,
+                totalArea: totalArea,
+                dominantType: determineDominantLandUse(analysis)
+            },
+            
+            // Complete amenities data with details
+            amenities: {
+                counts: analysis.amenities || {},
+                totalCount: totalAmenities,
+                details: analysis.amenityDetails || {},
+                // Summary by category
+                summary: {
+                    education: (analysis.amenities?.schools || 0) + (analysis.amenities?.universities || 0),
+                    commercial: analysis.amenities?.malls || 0,
+                    fuel: analysis.amenities?.fuelStations || 0,
+                    food: analysis.amenities?.restaurants || 0
+                }
+            },
+            
+            // Road infrastructure data
+            roads: {
+                counts: analysis.roads || {},
+                totalCount: totalRoads,
+                classification: determineSiteType(analysis),
+                // Road density per km²
+                density: totalRoads / (Math.PI * Math.pow(radius, 2))
+            },
+            
+            // Raw OSM data summary
+            rawOSMData: {
+                elementCount: rawData?.elements?.length || 0,
+                lastQueried: new Date().toISOString(),
+                dataTypes: {
+                    nodes: rawData?.elements?.filter(el => el.type === 'node').length || 0,
+                    ways: rawData?.elements?.filter(el => el.type === 'way').length || 0,
+                    relations: rawData?.elements?.filter(el => el.type === 'relation').length || 0
+                }
+            },
+            
+            // Analysis summary and scores
+            summary: {
+                landUseScore: calculateLandUseScore(analysis),
+                amenityScore: calculateAmenityScore(analysis),
+                accessibilityScore: calculateAccessibilityScore(analysis),
+                overallDiversity: calculateDiversityIndex(analysis),
+                analysisRadius: radius,
+                centerPoint: { lat, lng },
+                hasAreaAnalysis: !!areaAnalysis && totalArea > 0,
+                dataQuality: rawData?.elements?.length > 0 ? 'Good' : 'Limited'
+            },
+            
+            // Store polygon data for visual recreation
+            landUsePolygons: window.currentPolygonData || {},
+            
+            // Complete metadata
+            metadata: {
+                analysisTimestamp: new Date().toISOString(),
+                dataSource: 'Overpass API (OpenStreetMap)',
+                module: 'analysis',
+                version: '2.0',
+                queryType: 'Land Use Analysis with Amenities',
+                processingTime: new Date().toISOString(),
+                lastUpdated: new Date().toISOString()
+            }
+        };
+
+        if (window.storageManager) {
+            window.storageManager.setAnalysisData(analysisData);
+            console.log('✅ Complete analysis data saved to storage manager:', analysisData);
+        } else {
+            console.warn('⚠️ StorageManager not available, analysis data not saved');
+        }
+    } catch (error) {
+        console.error('❌ Error saving analysis data to storage:', error);
+    }
+}
+
+// Helper functions for scoring analysis results
+function calculateLandUseScore(analysis) {
+    const total = (analysis.residential || 0) + (analysis.commercial || 0) + (analysis.industrial || 0) + (analysis.other || 0);
+    if (total === 0) return 0;
+    
+    // Score based on land use diversity (higher diversity = higher score)
+    const types = [analysis.residential, analysis.commercial, analysis.industrial, analysis.other].filter(count => count > 0).length;
+    return Math.min((types / 4) * 100, 100);
+}
+
+function calculateAmenityScore(analysis) {
+    const amenities = analysis.amenities || {};
+    const totalAmenities = Object.values(amenities).reduce((sum, count) => sum + count, 0);
+    
+    if (totalAmenities === 0) return 0;
+    
+    // Score based on amenity diversity and count
+    const amenityTypes = Object.keys(amenities).filter(key => amenities[key] > 0).length;
+    const countScore = Math.min(totalAmenities * 2, 60); // Max 60 points for count
+    const diversityScore = Math.min(amenityTypes * 8, 40); // Max 40 points for diversity
+    
+    return Math.min(countScore + diversityScore, 100);
+}
+
+function calculateAccessibilityScore(analysis) {
+    const roads = analysis.roads || {};
+    const totalRoads = Object.values(roads).reduce((sum, count) => sum + count, 0);
+    
+    if (totalRoads === 0) return 0;
+    
+    // Weighted scoring based on road importance
+    const score = (roads.highways || 0) * 30 + (roads.primary || 0) * 20 + (roads.secondary || 0) * 10;
+    return Math.min(score, 100);
+}
+
+function calculateDiversityIndex(analysis) {
+    // Shannon diversity index for land use
+    const landUseCounts = [analysis.residential || 0, analysis.commercial || 0, analysis.industrial || 0, analysis.other || 0];
+    const total = landUseCounts.reduce((sum, count) => sum + count, 0);
+    
+    if (total === 0) return 0;
+    
+    let diversity = 0;
+    landUseCounts.forEach(count => {
+        if (count > 0) {
+            const proportion = count / total;
+            diversity -= proportion * Math.log(proportion);
+        }
+    });
+    
+    // Normalize to 0-100 scale (max diversity for 4 types is ln(4))
+    return (diversity / Math.log(4)) * 100;
+}
+
+// Load previous analysis data from storage
+function loadAnalysisDataFromStorage() {
+    try {
+        if (window.storageManager) {
+            const analysisData = window.storageManager.getAnalysisData();
+            if (analysisData && analysisData.searchCoordinates) {
+                console.log('📋 Loading comprehensive analysis data from storage:', analysisData);
+                
+                // Restore search coordinates
+                document.getElementById('latitude').value = analysisData.searchCoordinates.latitude;
+                document.getElementById('longitude').value = analysisData.searchCoordinates.longitude;
+                document.getElementById('radius').value = analysisData.searchCoordinates.radius;
+                
+                // Set map view only if map is available
+                if (map) {
+                    map.setView([analysisData.searchCoordinates.latitude, analysisData.searchCoordinates.longitude], 13);
+                    
+                    // Add radius circle
+                    addAnalysisRadius(analysisData.searchCoordinates.latitude, analysisData.searchCoordinates.longitude, analysisData.searchCoordinates.radius);
+                }
+                
+                // Reconstruct analysis object for UI compatibility (if using old format)
+                let reconstructedAnalysis = analysisData.landUseAnalysis;
+                if (!reconstructedAnalysis && analysisData.landUse && analysisData.amenities) {
+                    // Reconstruct from new comprehensive format
+                    reconstructedAnalysis = {
+                        residential: analysisData.landUse.counts?.residential || 0,
+                        commercial: analysisData.landUse.counts?.commercial || 0,
+                        industrial: analysisData.landUse.counts?.industrial || 0,
+                        other: analysisData.landUse.counts?.other || 0,
+                        amenities: analysisData.amenities.counts || {},
+                        amenityDetails: analysisData.amenities.details || {},
+                        roads: analysisData.roads.counts || {}
+                    };
+                }
+                
+                // Update UI with comprehensive data
+                if (reconstructedAnalysis) {
+                    // Store amenity details globally for tooltips
+                    window.currentAmenityDetails = reconstructedAnalysis.amenityDetails || analysisData.amenities?.details || {};
+                    
+                    // Update UI with either area analysis or land use counts
+                    const areaData = analysisData.areaAnalysis || analysisData.landUse?.areas;
+                    updateUI(reconstructedAnalysis, areaData);
+                    
+                    // Force chart update after a small delay to ensure it's ready
+                    setTimeout(() => {
+                        if (landUseChart && reconstructedAnalysis) {
+                            console.log('🔄 Force updating chart with stored data...');
+                            updateChartWithData(reconstructedAnalysis, areaData);
+                        }
+                        
+                        // Also refresh amenity markers if we have them
+                        if (window.currentAmenityDetails && Object.keys(window.currentAmenityDetails).length > 0) {
+                            console.log('📍 Adding amenity markers from stored data...');
+                            addAmenityMarkers(window.currentAmenityDetails);
+                        }
+                        
+                        // Recreate land use polygons from stored data
+                        if (analysisData.landUsePolygons || analysisData.polygonData) {
+                            console.log('🗺️ Recreating land use polygons from stored data...');
+                            recreateLandUsePolygons(analysisData.landUsePolygons || analysisData.polygonData, areaData);
+                        }
+                        
+                        // Update population map radius to match analysis radius
+                        if (window.updatePopulationRadius && analysisData.searchCoordinates) {
+                            console.log('👥 Updating population map radius...');
+                            window.updatePopulationRadius(
+                                analysisData.searchCoordinates.latitude,
+                                analysisData.searchCoordinates.longitude,
+                                analysisData.searchCoordinates.radius
+                            );
+                        }
+                    }, 200);
+                    
+                    // Update current analysis data
+                    currentAnalysisData = {
+                        data: { elements: [] }, // Placeholder since we don't store raw elements
+                        analysis: reconstructedAnalysis,
+                        areaAnalysis: areaData,
+                        lat: analysisData.searchCoordinates.latitude,
+                        lng: analysisData.searchCoordinates.longitude,
+                        radius: analysisData.searchCoordinates.radius
+                    };
+                    
+                    // Display comprehensive data summary
+                    if (analysisData.landUse && analysisData.amenities) {
+                        console.log('📊 Loaded comprehensive analysis data:');
+                        console.log('🏠 Land Use:', analysisData.landUse);
+                        console.log('🏪 Amenities:', analysisData.amenities);
+                        console.log('🛣️ Roads:', analysisData.roads);
+                        console.log('📈 Summary:', analysisData.summary);
+                        
+                        // Show success notification with data summary
+                        const toast = Toastify({
+                            text: `Analysis data restored: ${analysisData.totalElements || 0} elements, ${Object.keys(analysisData.amenities?.details || {}).length} amenity types`,
+                            duration: 3000,
+                            gravity: "top",
+                            position: "right",
+                            offset: {
+                                x: 20,
+                                y: 80
+                            },
+                            className: "bg-gradient-to-r from-blue-800 to-blue-700 text-white rounded-lg shadow-lg border border-blue-600/20 font-medium text-sm",
+                            stopOnFocus: true
+                        });
+                        toast.showToast();
+                    }
+                }
+                
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('❌ Error loading analysis data from storage:', error);
+        return false;
+    }
+}
+
 // Initialize everything when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    loadCoordinatesFromCookies();
-    initMap();
+    console.log('DOM loaded, initializing analysis page...');
+    
+    // Initialize map first
+    initAnalysisMap();
+    
+    // Initialize chart
     initChart();
     
-    // Add event listeners for input changes
-    document.getElementById('latitude').addEventListener('change', function() {
-        const lat = parseFloat(this.value);
-        const lng = parseFloat(document.getElementById('longitude').value);
-        if (!isNaN(lat) && !isNaN(lng)) {
-            map.setView([lat, lng]);
+    // Try loading from storage after a delay to ensure everything is ready
+    setTimeout(() => {
+        console.log('Attempting to load data from storage...');
+        
+        // Ensure storage manager is available
+        if (!window.storageManager) {
+            console.log('Initializing StorageManager...');
+            window.storageManager = new StorageManager();
         }
-    });
-    
-    document.getElementById('longitude').addEventListener('change', function() {
-        const lat = parseFloat(document.getElementById('latitude').value);
-        const lng = parseFloat(this.value);
-        if (!isNaN(lat) && !isNaN(lng)) {
-            map.setView([lat, lng]);
+        
+        if (!loadAnalysisDataFromStorage()) {
+            console.log('No storage data found, loading from cookies...');
+            loadCoordinatesFromCookies();
         }
-    });
+    }, 500); // Increased delay to ensure everything is loaded
     
-    document.getElementById('radius').addEventListener('change', function() {
+    // Add event listeners for input changes (with null checks)
+    const latElement = document.getElementById('latitude');
+    const lngElement = document.getElementById('longitude');
+    
+    if (latElement) {
+        latElement.addEventListener('change', function() {
+            const lat = parseFloat(this.value);
+            const lng = parseFloat(document.getElementById('longitude')?.value);
+            if (!isNaN(lat) && !isNaN(lng) && map) {
+                map.setView([lat, lng]);
+            }
+            saveCurrentAnalysisCoordinatesToStorage();
+        });
+    }
+    
+    if (lngElement) {
+        lngElement.addEventListener('change', function() {
+            const lat = parseFloat(document.getElementById('latitude')?.value);
+            const lng = parseFloat(this.value);
+            if (!isNaN(lat) && !isNaN(lng) && map) {
+                map.setView([lat, lng]);
+            }
+            saveCurrentAnalysisCoordinatesToStorage();
+        });
+    }
+    
+    const radiusElement = document.getElementById('radius');
+    if (radiusElement) {
+        radiusElement.addEventListener('change', function() {
+            const lat = parseFloat(document.getElementById('latitude')?.value);
+            const lng = parseFloat(document.getElementById('longitude')?.value);
+            const radius = parseFloat(this.value) * 1000;
+            
+            if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius) && map) {
+                // Update circle on map
+                if (window.analysisRadius) {
+                    map.removeLayer(window.analysisRadius);
+                }
+                window.analysisRadius = L.circle([lat, lng], {
+                    color: '#3b82f6',
+                    fillColor: '#60a5fa',
+                    fillOpacity: 0.1,
+                    radius: radius
+                }).addTo(map);
+            }
+            saveCurrentAnalysisCoordinatesToStorage();
+        });
+    }
+});
+
+// Save current coordinates to storage for analysis
+function saveCurrentAnalysisCoordinatesToStorage() {
+    try {
         const lat = parseFloat(document.getElementById('latitude').value);
         const lng = parseFloat(document.getElementById('longitude').value);
-        const radius = parseFloat(this.value) * 1000;
+        const radius = parseFloat(document.getElementById('radius').value);
         
         if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
-            // Update circle on map
-            map.eachLayer(layer => {
-                if (layer instanceof L.Circle && layer.options.radius) {
-                    map.removeLayer(layer);
+            const coordData = {
+                searchCoordinates: {
+                    latitude: lat,
+                    longitude: lng,
+                    radius: radius
+                },
+                metadata: {
+                    lastUpdated: new Date().toISOString(),
+                    module: 'analysis'
                 }
-            });
+            };
             
-            L.circle([lat, lng], {
-                radius: radius,
-                color: '#3b82f6',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.1,
-                weight: 2
-            }).addTo(map);
-        }
-    });
-    
-    // Add click handler for map
-    map.on('click', function(e) {
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-        
-        document.getElementById('latitude').value = lat.toFixed(6);
-        document.getElementById('longitude').value = lng.toFixed(6);
-        
-        // Update marker position
-        map.eachLayer(layer => {
-            if (layer instanceof L.Marker) {
-                layer.setLatLng([lat, lng]);
+            if (window.storageManager) {
+                // Get existing analysis data and update coordinates
+                const existingData = window.storageManager.getAnalysisData();
+                const updatedData = { ...existingData, ...coordData };
+                window.storageManager.setAnalysisData(updatedData);
             }
-        });
-    });
-});
+        }
+    } catch (error) {
+        console.error('❌ Error saving coordinates to storage:', error);
+    }
+}
+
 // Working Traffic Congestion Analysis - Fixed Implementation
 let trafficMap = null;
 let centerMarker = null;
@@ -1093,12 +1848,138 @@ document.addEventListener('DOMContentLoaded', function() {
 // Make function globally available
 window.analyzeTrafficArea = analyzeTrafficArea;
 
+// Toggle amenity markers visibility
+function toggleAmenityMarkers() {
+    if (!amenityMarkersGroup) {
+        console.log('No amenity markers to toggle');
+        return;
+    }
+    
+    const toggleBtn = document.getElementById('amenityToggleBtn');
+    
+    if (amenityMarkersVisible) {
+        // Hide amenity markers
+        map.removeLayer(amenityMarkersGroup);
+        amenityMarkersVisible = false;
+        toggleBtn.style.opacity = '0.5';
+        toggleBtn.title = 'Show Amenity Markers';
+        console.log('🔍 Amenity markers hidden');
+        
+        // Show notification
+        Toastify({
+            text: "🔍 Amenity markers hidden",
+            duration: 2000,
+            gravity: "top",
+            position: "right",
+            offset: { x: 20, y: 80 },
+            className: "bg-gradient-to-r from-gray-700 to-gray-600 text-white rounded-lg shadow-lg border border-gray-600/20 font-medium text-sm",
+            stopOnFocus: true
+        }).showToast();
+    } else {
+        // Show amenity markers
+        amenityMarkersGroup.addTo(map);
+        amenityMarkersVisible = true;
+        toggleBtn.style.opacity = '1';
+        toggleBtn.title = 'Hide Amenity Markers';
+        console.log('📍 Amenity markers shown');
+        
+        // Show notification
+        Toastify({
+            text: "📍 Amenity markers shown",
+            duration: 2000,
+            gravity: "top",
+            position: "right",
+            offset: { x: 20, y: 80 },
+            className: "bg-gradient-to-r from-blue-700 to-blue-600 text-white rounded-lg shadow-lg border border-blue-600/20 font-medium text-sm",
+            stopOnFocus: true
+        }).showToast();
+    }
+}
 
+// Toggle center marker and radius visibility
+function toggleCenterMarker() {
+    const toggleBtn = document.getElementById('centerToggleBtn');
+    
+    if (centerMarkerVisible) {
+        // Hide center marker and radius
+        if (currentMarker) {
+            map.removeLayer(currentMarker);
+        }
+        if (currentCircle) {
+            map.removeLayer(currentCircle);
+        }
+        if (window.analysisRadius) {
+            map.removeLayer(window.analysisRadius);
+        }
+        
+        centerMarkerVisible = false;
+        toggleBtn.style.opacity = '0.5';
+        toggleBtn.title = 'Show Center Marker & Radius';
+        console.log('🎯 Center marker and radius hidden');
+        
+        // Show notification
+        Toastify({
+            text: "🎯 Center marker & radius hidden",
+            duration: 2000,
+            gravity: "top",
+            position: "right",
+            offset: { x: 20, y: 80 },
+            className: "bg-gradient-to-r from-gray-700 to-gray-600 text-white rounded-lg shadow-lg border border-gray-600/20 font-medium text-sm",
+            stopOnFocus: true
+        }).showToast();
+    } else {
+        // Show center marker and radius
+        const lat = parseFloat(document.getElementById('latitude').value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+        const radius = parseFloat(document.getElementById('radius').value) * 1000;
+        
+        if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
+            // Add center marker
+            currentMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: '<div style="background: #3b82f6; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            }).addTo(map).bindPopup('Analysis Center Point');
+            
+            // Add radius circle
+            currentCircle = L.circle([lat, lng], {
+                radius: radius,
+                color: '#3b82f6',
+                fillColor: 'transparent',
+                fillOpacity: 0,
+                weight: 3,
+                dashArray: '10, 10'
+            }).addTo(map);
+        }
+        
+        centerMarkerVisible = true;
+        toggleBtn.style.opacity = '1';
+        toggleBtn.title = 'Hide Center Marker & Radius';
+        console.log('🎯 Center marker and radius shown');
+        
+        // Show notification
+        Toastify({
+            text: "🎯 Center marker & radius shown",
+            duration: 2000,
+            gravity: "top",
+            position: "right",
+            offset: { x: 20, y: 80 },
+            className: "bg-gradient-to-r from-purple-700 to-purple-600 text-white rounded-lg shadow-lg border border-purple-600/20 font-medium text-sm",
+            stopOnFocus: true
+        }).showToast();
+    }
+}
 
+// Make toggle functions globally available
+window.toggleAmenityMarkers = toggleAmenityMarkers;
+window.toggleCenterMarker = toggleCenterMarker;
 
+// Population Analysis Section
 let populationMap = null;
- centerMarker = null; // Uncommented - needed for pinpoint
- analysisRadius = null; // Uncommented - needed for radius circle
+// centerMarker and analysisRadius are already declared above
 let populationBubbles = [];
 let populationLayerVisible = false;
 
@@ -1412,15 +2293,62 @@ function addCenterMarker(lat, lng) {
     `);
 }
 
+// Helper function to specifically update chart with data
+function updateChartWithData(analysis, areaAnalysis = null) {
+    if (!landUseChart) {
+        console.error('Chart not available for update');
+        return;
+    }
+    
+    const chartData = areaAnalysis || {
+        residential: analysis.residential || 0,
+        commercial: analysis.commercial || 0,
+        industrial: analysis.industrial || 0,
+        other: analysis.other || 0
+    };
+    
+    const total = chartData.residential + chartData.commercial + chartData.industrial + chartData.other;
+    
+    if (total > 0) {
+        const residentialPercent = (chartData.residential / total) * 100;
+        const commercialPercent = (chartData.commercial / total) * 100;
+        const industrialPercent = (chartData.industrial / total) * 100;
+        const otherPercent = (chartData.other / total) * 100;
+        
+        console.log('📊 Updating chart with percentages:', {
+            residential: residentialPercent.toFixed(1) + '%',
+            commercial: commercialPercent.toFixed(1) + '%', 
+            industrial: industrialPercent.toFixed(1) + '%',
+            other: otherPercent.toFixed(1) + '%'
+        });
+        
+        landUseChart.data.datasets[0].data = [
+            residentialPercent,
+            commercialPercent,
+            industrialPercent,
+            otherPercent
+        ];
+        
+        landUseChart.update('resize');
+    }
+}
+
 // Add analysis radius circle
 function addAnalysisRadius(lat, lng, radius) {
+    // Make sure map is available
+    if (!map) {
+        console.warn('Map not available for addAnalysisRadius');
+        return;
+    }
+    
     // Remove existing radius
-    if (analysisRadius) {
-        populationMap.removeLayer(analysisRadius);
+    if (currentCircle) {
+        map.removeLayer(currentCircle);
+        currentCircle = null;
     }
 
     // Create radius circle
-    analysisRadius = L.circle([lat, lng], {
+    currentCircle = L.circle([lat, lng], {
         radius: radius * 1000, // Convert km to meters
         color: '#3b82f6',
         fillColor: '#3b82f6',
@@ -1428,7 +2356,7 @@ function addAnalysisRadius(lat, lng, radius) {
         weight: 2,
         opacity: 0.8,
         dashArray: '8, 4'
-    }).addTo(populationMap);
+    }).addTo(map);
 }
 
 // Generate population bubbles using real API data
@@ -1672,6 +2600,145 @@ window.clearPopulationAnalysis = clearPopulationAnalysis;
 
 window.startAnalysis = startAnalysis;
 
+// Simplified land use analysis for storage manager (no HTML/map dependencies)
+async function performLandUseAnalysisForStorage(lat, lng, radius) {
+    try {
+        console.log(`🔍 Performing land use analysis for storage: ${lat}, ${lng}, radius: ${radius}km`);
+        
+        // Fetch land use data from Overpass API
+        const overpassQuery = `
+            [out:json][timeout:30];
+            (
+                way["landuse"](around:${radius * 1000},${lat},${lng});
+                rel["landuse"](around:${radius * 1000},${lat},${lng});
+                way["amenity"](around:${radius * 1000},${lat},${lng});
+                node["amenity"](around:${radius * 1000},${lat},${lng});
+                way["highway"](around:${radius * 1000},${lat},${lng});
+                way["building"](around:${radius * 1000},${lat},${lng});
+            );
+            out geom;
+        `;
 
+        const response = await fetch('https://overpass-api.de/api/interpreter', {
+            method: 'POST',
+            body: overpassQuery,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
 
+        if (!response.ok) {
+            throw new Error(`Overpass API error: ${response.status}`);
+        }
 
+        const data = await response.json();
+        const elements = data.elements || [];
+
+        // Analyze land use
+        const landUseCounts = {};
+        const amenityCounts = {};
+        const roadCounts = {};
+        let buildingCount = 0;
+        let totalArea = 0;
+
+        elements.forEach(element => {
+            const tags = element.tags || {};
+            
+            // Land use analysis
+            if (tags.landuse) {
+                landUseCounts[tags.landuse] = (landUseCounts[tags.landuse] || 0) + 1;
+                // Estimate area based on geometry (simplified)
+                if (element.geometry) {
+                    totalArea += 1000; // Mock area calculation
+                }
+            }
+            
+            // Amenities analysis
+            if (tags.amenity) {
+                amenityCounts[tags.amenity] = (amenityCounts[tags.amenity] || 0) + 1;
+            }
+            
+            // Roads analysis
+            if (tags.highway) {
+                roadCounts[tags.highway] = (roadCounts[tags.highway] || 0) + 1;
+            }
+            
+            // Buildings
+            if (tags.building) {
+                buildingCount++;
+            }
+        });
+
+        // Determine dominant land use
+        const dominantLandUse = Object.keys(landUseCounts).reduce((a, b) => 
+            landUseCounts[a] > landUseCounts[b] ? a : b, 'mixed');
+
+        // Determine site type based on land use and amenities
+        let siteType = 'Mixed';
+        if (landUseCounts.residential > (landUseCounts.commercial || 0)) {
+            siteType = 'Residential';
+        } else if (landUseCounts.commercial > 0 || landUseCounts.retail > 0) {
+            siteType = 'Commercial';
+        } else if (landUseCounts.industrial > 0) {
+            siteType = 'Industrial';
+        }
+
+        // Calculate percentages
+        const totalLandUse = Object.values(landUseCounts).reduce((sum, count) => sum + count, 0);
+        const landUsePercentages = {};
+        Object.keys(landUseCounts).forEach(type => {
+            landUsePercentages[type] = totalLandUse > 0 ? 
+                ((landUseCounts[type] / totalLandUse) * 100).toFixed(1) : 0;
+        });
+
+        const analysisResult = {
+            siteType: siteType,
+            dominantLandUse: dominantLandUse,
+            totalElements: elements.length,
+            landUse: {
+                counts: landUseCounts,
+                areas: { total: totalArea }, // Simplified area calculation
+                percentages: landUsePercentages
+            },
+            amenities: amenityCounts,
+            roads: roadCounts,
+            buildings: buildingCount,
+            coordinates: { lat, lng, radius }
+        };
+
+        console.log(`✅ Land use analysis completed for storage:`, analysisResult);
+        return analysisResult;
+
+    } catch (error) {
+        console.error('❌ Error performing land use analysis for storage:', error);
+        
+        // Return minimal fallback data
+        return {
+            siteType: 'Mixed',
+            dominantLandUse: 'mixed',
+            totalElements: 0,
+            landUse: {
+                counts: { mixed: 1 },
+                areas: { total: 1000 },
+                percentages: { mixed: 100 }
+            },
+            amenities: {},
+            roads: {},
+            buildings: 0,
+            coordinates: { lat, lng, radius }
+        };
+    }
+}
+
+// Export functions globally for storage manager
+window.startAnalysis = startAnalysis;
+window.analyzeLandUse = analyzeLandUse;
+window.fetchOverpassData = fetchOverpassData;
+window.performLandUseAnalysisForStorage = performLandUseAnalysisForStorage;
+
+console.log('🔬 Analysis functions exported globally:', {
+    startAnalysis: typeof startAnalysis,
+    analyzeLandUse: typeof analyzeLandUse,
+    fetchOverpassData: typeof fetchOverpassData,
+    performLandUseAnalysisForStorage: typeof performLandUseAnalysisForStorage
+});

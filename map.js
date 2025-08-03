@@ -54,6 +54,7 @@ let elementIdCounter = 0;
             const lat = parseFloat(document.getElementById('latitude').value);
             const lng = parseFloat(document.getElementById('longitude').value);
             const radius = parseFloat(document.getElementById('radius').value);
+            console.log("XXXXXXX hello XXXXXXXXXXXX");
 
             if (isNaN(lat) || isNaN(lng) || isNaN(radius) || radius <= 0) {
                 alert('Please enter valid coordinates and radius');
@@ -62,11 +63,13 @@ let elementIdCounter = 0;
 
             // Show enhanced loading overlay
             showLoading();
+            console.log("XXXXXXX hello XXXXXXXXXXXX");
+            
 
             try {
                 // Clear previous markers
                 clearMap();
-
+                clearAllData();
                 // Add search marker
                 const searchMarker = L.marker([lat, lng], {
                     icon: L.divIcon({
@@ -993,13 +996,121 @@ let elementIdCounter = 0;
         }
 
 
+        // Save map data to storage manager
+function saveMapDataToStorage(lat, lng, radius, stations) {
+    try {
+        const mapData = {
+            searchCoordinates: {
+                latitude: lat,
+                longitude: lng,
+                radius: radius
+            },
+            stations: stations.map(station => ({
+                id: station.id,
+                name: station.name,
+                brand: station.brand,
+                lat: station.lat,
+                lng: station.lng,
+                distance: station.distance,
+                travelTime: station.travelTime,
+                distanceSource: station.distanceSource,
+                address: station.address,
+                phone: station.phone,
+                services: station.services,
+                rating: station.rating,
+                price: station.price,
+                opening_hours: station.opening_hours,
+                operator: station.operator,
+                fuels: station.fuels
+            })),
+            totalStations: stations.length,
+            brands: [...new Set(stations.map(s => s.brand))],
+            psoStations: stations.filter(s => s.brand === 'PSO').length,
+            competitorStations: stations.filter(s => s.brand !== 'PSO').length,
+            averageDistance: stations.length > 0 ? (stations.reduce((sum, s) => sum + s.distance, 0) / stations.length).toFixed(2) : 0,
+            searchRadius: radius,
+            metadata: {
+                searchTimestamp: new Date().toISOString(),
+                apiSource: 'Overpass API + Multiple Routing Services',
+                totalFound: stations.length,
+                module: 'map'
+            }
+        };
+
+        if (window.storageManager) {
+            window.storageManager.setMapData(mapData);
+            console.log('✅ Map data saved to storage manager:', mapData);
+        } else {
+            console.warn('⚠️ StorageManager not available, data not saved');
+        }
+    } catch (error) {
+        console.error('❌ Error saving map data to storage:', error);
+    }
+}
+
         // Initialize map when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            loadCoordinatesFromCookies();
             initMap();
+            
+            // Try loading from storage first, then fall back to cookies
+            setTimeout(() => {
+                if (!loadMapDataFromStorage()) {
+                    loadCoordinatesFromCookies();
+                }
+            }, 100); // Small delay to ensure storage manager is loaded
+            
+            // Add coordinate change listeners for auto-save
+            setupCoordinateListeners();
         });
 
+        // Setup coordinate change listeners
+        function setupCoordinateListeners() {
+            const latElement = document.getElementById('latitude');
+            const lngElement = document.getElementById('longitude');
+            const radiusElement = document.getElementById('radius');
+            
+            if (latElement) {
+                latElement.addEventListener('input', saveCurrentCoordinatesToStorage);
+            }
+            if (lngElement) {
+                lngElement.addEventListener('input', saveCurrentCoordinatesToStorage);
+            }
+            if (radiusElement) {
+                radiusElement.addEventListener('input', saveCurrentCoordinatesToStorage);
+            }
+        }
 
+        // Save current coordinates to storage
+        function saveCurrentCoordinatesToStorage() {
+            try {
+                const lat = parseFloat(document.getElementById('latitude').value);
+                const lng = parseFloat(document.getElementById('longitude').value);
+                const radius = parseFloat(document.getElementById('radius').value);
+                
+                if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
+                    const coordData = {
+                        searchCoordinates: {
+                            latitude: lat,
+                            longitude: lng,
+                            radius: radius
+                        },
+                        metadata: {
+                            lastUpdated: new Date().toISOString(),
+                            module: 'map'
+                        }
+                    };
+                    
+                    if (window.storageManager) {
+                        // Get existing map data and update coordinates
+                        const existingData = window.storageManager.getMapData();
+                        const updatedData = { ...existingData, ...coordData };
+                        window.storageManager.setMapData(updatedData);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error saving coordinates to storage:', error);
+            }
+        }
         // Configuration
         const APP_CONFIG = {
             OVERPASS_API: 'https://overpass-api.de/api/interpreter',
@@ -1527,6 +1638,63 @@ function getCookie(name) {
     return null;
 }
 
+// Load previous map data from storage
+function loadMapDataFromStorage() {
+    try {
+        if (window.storageManager) {
+            const mapData = window.storageManager.getMapData();
+            if (mapData && mapData.stations && mapData.stations.length > 0) {
+                console.log('📋 Loading previous map data from storage:', mapData);
+                
+                // Restore search coordinates
+                if (mapData.searchCoordinates) {
+                    document.getElementById('latitude').value = mapData.searchCoordinates.latitude;
+                    document.getElementById('longitude').value = mapData.searchCoordinates.longitude;
+                    document.getElementById('radius').value = mapData.searchCoordinates.radius;
+                    
+                    // Set map view
+                    map.setView([mapData.searchCoordinates.latitude, mapData.searchCoordinates.longitude], 14);
+                    
+                    // Add search marker
+                    const searchMarker = L.marker([mapData.searchCoordinates.latitude, mapData.searchCoordinates.longitude], {
+                        icon: L.divIcon({
+                            html: `
+                                <div style="width: 32px; height: 32px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="#3b82f6" viewBox="0 0 24 24">
+                                    <path fill-rule="evenodd" d="M12 2C8.686 2 6 4.686 6 8c0 4.97 6 13 6 13s6-8.03 6-13c0-3.314-2.686-6-6-6zm0 8a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                            `,
+                            className: 'custom-marker',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32],
+                        })
+                    }).addTo(map);
+
+                    // Add radius circle
+                    radiusCircle = L.circle([mapData.searchCoordinates.latitude, mapData.searchCoordinates.longitude], {
+                        color: '#10b981',
+                        fillColor: '#34d399',
+                        fillOpacity: 0.1,
+                        weight: 2,
+                        radius: mapData.searchCoordinates.radius * 1000
+                    }).addTo(map);
+                }
+                
+                // Restore stations
+                displayStationResults(mapData.stations);
+                updateStatistics(mapData.stations);
+                
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('❌ Error loading map data from storage:', error);
+        return false;
+    }
+}
+
 function loadCoordinatesFromCookies() {
     const savedLat = getCookie('map_latitude');
     const savedLng = getCookie('map_longitude');
@@ -1564,10 +1732,13 @@ function loadCoordinatesFromCookies() {
         
         // Show enhanced loading overlay
         showLoading();
-
+        
+        // console.log('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
         try {
+            console.log(`🔍 Searching for fuel stations within ${radius} km of (${lat.toFixed(6)}, ${lng.toFixed(6)})...`);
             // Clear previous markers
             clearMap();
+            clearAllData();
 
             // Set map view to search location and zoom in
             map.setView([lat, lng], 14);
@@ -1609,6 +1780,9 @@ function loadCoordinatesFromCookies() {
 
             // Calculate accurate distances with multiple routing services
             await fetchDistancesWithRouting(lat, lng, stations);
+            
+            // Save map data to storage manager
+            saveMapDataToStorage(lat, lng, radius, stations);
             
             // Re-display with accurate distances
             displayStationResults(stations);
@@ -2294,5 +2468,8 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 exportBtn.disabled = false;
             }
         }
+
+        // Export the original searchStations function for storage manager use
+        window.searchStations = searchStations;
 
      

@@ -1,40 +1,115 @@
 // SSM.js - Site Selection Metrics Implementation
 // PSO Site Classification System based on official parameters
 
-// OSM Data Integration Functions
+// OSM Data Integration Functions with Rate Limiting
 // ====================================
 
-// Fetch OSM data using Overpass API
+// Rate limiting variables
+let lastAPICall = 0;
+const API_DELAY = 1500; // 1.5 seconds between API calls
+let requestQueue = [];
+let isProcessingQueue = false;
+
+// Queue-based rate-limited fetch for OSM data
 async function fetchOSMData(lat, lng, radius, query) {
+    return new Promise((resolve, reject) => {
+        requestQueue.push({ lat, lng, radius, query, resolve, reject });
+        processQueue();
+    });
+}
+
+// Process the request queue with proper rate limiting
+async function processQueue() {
+    if (isProcessingQueue || requestQueue.length === 0) return;
+    
+    isProcessingQueue = true;
+    
+    while (requestQueue.length > 0) {
+        const request = requestQueue.shift();
+        
+        try {
+            // Ensure minimum delay between requests
+            const now = Date.now();
+            const timeSinceLastCall = now - lastAPICall;
+            if (timeSinceLastCall < API_DELAY) {
+                await new Promise(resolve => setTimeout(resolve, API_DELAY - timeSinceLastCall));
+            }
+            
+            const result = await makeOSMRequest(request.lat, request.lng, request.radius, request.query);
+            lastAPICall = Date.now();
+            request.resolve(result);
+            
+        } catch (error) {
+            console.warn(`OSM API request failed, using fallback data:`, error);
+            request.resolve([]); // Return empty array for fallback
+        }
+        
+        // Small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    isProcessingQueue = false;
+}
+
+// Actual OSM API request implementation with retry logic
+async function makeOSMRequest(lat, lng, radius, query, retries = 2) {
     const overpassUrl = 'https://overpass-api.de/api/interpreter';
     const bbox = calculateBoundingBox(lat, lng, radius);
     
     const overpassQuery = `
-        [out:json][timeout:25];
+        [out:json][timeout:30];
         (
             ${query}
         );
         out geom;
     `;
+
     
-    try {
-        const response = await fetch(overpassUrl, {
-            method: 'POST',
-            body: overpassQuery,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            console.log(`🔄 OSM API request attempt ${attempt + 1}/${retries + 1}`);
+            
+            const response = await fetch(overpassUrl, {
+                method: 'POST',
+                body: overpassQuery,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+            
+            if (response.status === 429) {
+                // Rate limited - wait longer before retry
+                const waitTime = Math.pow(2, attempt) * 2000; // Exponential backoff: 2s, 4s, 8s
+                console.log(`⏳ Rate limited (429), waiting ${waitTime/1000}s before retry...`);
+                if (attempt < retries) {
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    continue;
+                } else {
+                    throw new Error(`Rate limited after ${retries + 1} attempts`);
+                }
             }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`OSM API request failed: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`OSM API request failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log(`✅ OSM API request successful, got ${data.elements?.length || 0} elements`);
+            return data.elements || [];
+            
+        } catch (error) {
+            console.warn(`❌ OSM API attempt ${attempt + 1} failed:`, error.message);
+            
+            if (attempt === retries) {
+                // Last attempt failed, throw the error
+                throw error;
+            }
+            
+            // Wait before retry (shorter wait for non-rate-limit errors)
+            const waitTime = (attempt + 1) * 1000; // 1s, 2s, 3s
+            console.log(`⏳ Waiting ${waitTime/1000}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
         }
-        
-        const data = await response.json();
-        return data.elements || [];
-    } catch (error) {
-        console.warn('OSM API request failed, using fallback data:', error);
-        return [];
     }
 }
 
@@ -317,22 +392,129 @@ const CATEGORY_THRESHOLDS = {
 
 // Initialize SSM functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('SSM System Initialized');
+    console.log('🎯 SSM System Initialized');
     
     // Add event listeners
     setupEventListeners();
+    
+    // Auto-load coordinates from COOKIES on page load
+    console.log('🍪 Auto-loading coordinates from cookies...');
+    const cookieLat = getCookie('map_latitude');
+    const cookieLng = getCookie('map_longitude');
+    const cookieRadius = getCookie('map_radius');
+    
+    console.log('🍪 Found cookies:', {
+        map_latitude: cookieLat,
+        map_longitude: cookieLng,
+        map_radius: cookieRadius
+    });
+    
+    if (cookieLat && cookieLng) {
+        console.log('✅ Auto-loading coordinates from cookies on page load');
+        
+        // Fill main SSM inputs
+        const latEl = document.getElementById('ssm-latitude');
+        const lngEl = document.getElementById('ssm-longitude');
+        const radiusEl = document.getElementById('ssm-radius');
+        
+        if (latEl) latEl.value = cookieLat;
+        if (lngEl) lngEl.value = cookieLng;
+        if (radiusEl && cookieRadius) radiusEl.value = cookieRadius;
+        
+        // Fill auto-generate inputs if they exist
+        const autoLatEl = document.getElementById('auto-latitude');
+        const autoLngEl = document.getElementById('auto-longitude');
+        const autoRadiusEl = document.getElementById('auto-radius');
+        
+        if (autoLatEl) autoLatEl.value = cookieLat;
+        if (autoLngEl) autoLngEl.value = cookieLng;
+        if (autoRadiusEl && cookieRadius) autoRadiusEl.value = cookieRadius;
+        
+    } else {
+        console.log('⚠️ No coordinates found in cookies on page load');
+    }
+    
+    // Try loading from storage as backup (after a small delay)
+    setTimeout(() => {
+        loadSSMDataFromStorage();
+    }, 500);
 });
 
 // Setup event listeners
 function setupEventListeners() {
-    // Coordinate input validation
-    document.getElementById('ssm-latitude').addEventListener('input', validateCoordinates);
-    document.getElementById('ssm-longitude').addEventListener('input', validateCoordinates);
+    // Coordinate input validation and auto-save (only if elements exist)
+    const latitudeEl = document.getElementById('ssm-latitude');
+    const longitudeEl = document.getElementById('ssm-longitude');
+    const radiusEl = document.getElementById('ssm-radius');
     
-    // Site type change handler
-    document.querySelectorAll('input[name="siteType"]').forEach(radio => {
-        radio.addEventListener('change', updateSiteTypeDisplay);
-    });
+    if (latitudeEl) {
+        latitudeEl.addEventListener('input', function() {
+            validateCoordinates();
+            saveCoordinatesToStorage();
+        });
+    }
+    
+    if (longitudeEl) {
+        longitudeEl.addEventListener('input', function() {
+            validateCoordinates();
+            saveCoordinatesToStorage();
+        });
+    }
+    
+    if (radiusEl) {
+        radiusEl.addEventListener('input', function() {
+            saveCoordinatesToStorage();
+        });
+    }
+    
+    // Site type change handler (only if elements exist)
+    const siteTypeRadios = document.querySelectorAll('input[name="siteType"]');
+    if (siteTypeRadios.length > 0) {
+        siteTypeRadios.forEach(radio => {
+            radio.addEventListener('change', updateSiteTypeDisplay);
+        });
+    }
+}
+
+// Save coordinates to storage for persistence
+function saveCoordinatesToStorage() {
+    try {
+        const latEl = document.getElementById('ssm-latitude');
+        const lngEl = document.getElementById('ssm-longitude');
+        const radiusEl = document.getElementById('ssm-radius');
+        
+        if (!latEl || !lngEl || !radiusEl) {
+            console.warn('⚠️ SSM coordinate elements not found, skipping storage save');
+            return;
+        }
+        
+        const lat = parseFloat(latEl.value);
+        const lng = parseFloat(lngEl.value);
+        const radius = parseFloat(radiusEl.value);
+        
+        if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
+            const coordData = {
+                searchCoordinates: {
+                    latitude: lat,
+                    longitude: lng,
+                    radius: radius
+                },
+                metadata: {
+                    lastUpdated: new Date().toISOString(),
+                    module: 'ssm'
+                }
+            };
+            
+            if (window.storageManager) {
+                // Get existing SSM data and update coordinates
+                const existingData = window.storageManager.getSSMData();
+                const updatedData = { ...existingData, ...coordData };
+                window.storageManager.setSSMData(updatedData);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error saving coordinates to storage:', error);
+    }
 }
 
 
@@ -364,31 +546,92 @@ function loadCoordinatesFromCookies() {
     const savedLng = getCookie('map_longitude');
     const savedRadius = getCookie('map_radius');
     
-    if (savedLat && savedLng && savedRadius) {
-        // Auto-fill the input fields
-        document.getElementById('ssm-latitude').value = savedLat;
-        document.getElementById('ssm-longitude').value = savedLng;
-        document.getElementById('ssm-radius').value = savedRadius;
+    console.log('🍪 Loading coordinates from cookies:', { 
+        map_latitude: savedLat, 
+        map_longitude: savedLng, 
+        map_radius: savedRadius 
+    });
+    
+    if (savedLat && savedLng) {
+        // Auto-fill the main SSM input fields with null checks
+        const latEl = document.getElementById('ssm-latitude');
+        const lngEl = document.getElementById('ssm-longitude');
+        const radiusEl = document.getElementById('ssm-radius');
         
-        console.log('Coordinates loaded from cookies:', { 
-            lat: savedLat, 
-            lng: savedLng, 
-            radius: savedRadius 
-        });
+        if (latEl) {
+            latEl.value = savedLat;
+            console.log('✅ Filled ssm-latitude:', savedLat);
+        } else {
+            console.warn('⚠️ ssm-latitude element not found');
+        }
         
-        // Optional: Show a brief notification that coordinates were loaded
+        if (lngEl) {
+            lngEl.value = savedLng;
+            console.log('✅ Filled ssm-longitude:', savedLng);
+        } else {
+            console.warn('⚠️ ssm-longitude element not found');
+        }
+        
+        if (radiusEl && savedRadius) {
+            radiusEl.value = savedRadius;
+            console.log('✅ Filled ssm-radius:', savedRadius);
+        } else if (savedRadius) {
+            console.warn('⚠️ ssm-radius element not found');
+        }
+        
+        // Auto-fill the auto-generate input fields if they exist
+        const autoLatEl = document.getElementById('auto-latitude');
+        const autoLngEl = document.getElementById('auto-longitude');
+        const autoRadiusEl = document.getElementById('auto-radius');
+        
+        if (autoLatEl) {
+            autoLatEl.value = savedLat;
+            console.log('✅ Filled auto-latitude:', savedLat);
+        }
+        if (autoLngEl) {
+            autoLngEl.value = savedLng;
+            console.log('✅ Filled auto-longitude:', savedLng);
+        }
+        if (autoRadiusEl && savedRadius) {
+            autoRadiusEl.value = savedRadius;
+            console.log('✅ Filled auto-radius:', savedRadius);
+        }
+        
+        console.log('✅ Coordinates loaded from cookies successfully');
+        
+        // Show success notification
+        if (typeof Toastify !== 'undefined') {
             Toastify({
-        text: "Coordinates loaded from previous search",
-        duration: 2000,
-        gravity: "top",
-        position: "right",
-        offset: {
-            y: 80
-        },
-        className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
-        stopOnFocus: true
-    }).showToast();
-            }
+                text: "✅ Coordinates loaded from cookies",
+                duration: 2000,
+                gravity: "top",
+                position: "right",
+                offset: {
+                    y: 80
+                },
+                className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+                stopOnFocus: true
+            }).showToast();
+        } else {
+            // Fallback if Toastify is not available
+            console.log('📢 Coordinates loaded from previous search');
+        }
+    } else {
+        console.log('⚠️ No coordinates found in cookies');
+        if (typeof Toastify !== 'undefined') {
+            Toastify({
+                text: "⚠️ No saved coordinates found",
+                duration: 2000,
+                gravity: "top",
+                position: "right",
+                offset: {
+                    y: 80
+                },
+                className: "bg-gradient-to-r from-yellow-800 to-yellow-700 text-white rounded-lg shadow-lg border border-yellow-600/20 font-medium text-sm",
+                stopOnFocus: true
+            }).showToast();
+        }
+    }
 }
 
 async function performSSMAnalysis() {
@@ -397,9 +640,20 @@ async function performSSMAnalysis() {
         return;
     }
     
-    const lat = parseFloat(document.getElementById('ssm-latitude').value);
-    const lng = parseFloat(document.getElementById('ssm-longitude').value);
-    const radius = parseFloat(document.getElementById('ssm-radius').value);
+    // Get coordinates with null checks
+    const latEl = document.getElementById('ssm-latitude');
+    const lngEl = document.getElementById('ssm-longitude');
+    const radiusEl = document.getElementById('ssm-radius');
+    
+    if (!latEl || !lngEl || !radiusEl) {
+        showTemporaryMessage('❌ SSM coordinate input fields not found', 'error');
+        console.error('❌ SSM coordinate elements not found');
+        return;
+    }
+    
+    const lat = parseFloat(latEl.value);
+    const lng = parseFloat(lngEl.value);
+    const radius = parseFloat(radiusEl.value);
     
     // Auto-detect site type based on coordinates
     const siteType = autoDetectSiteType(lat, lng);
@@ -453,6 +707,9 @@ async function performSSMAnalysis() {
         // Display results
         displaySSMResults(currentSSMData);
         
+        // Save SSM data to storage manager
+        saveSSMDataToStorage(currentSSMData);
+        
         console.log('✅ SSM Analysis completed successfully');
         
     } catch (error) {
@@ -464,17 +721,335 @@ async function performSSMAnalysis() {
     }
 }
 
-// Execute Comprehensive Analysis
-async function executeComprehensiveAnalysis(lat, lng, radius, siteType) {
-    console.log('📊 Executing comprehensive analysis...');
+// Save essential SSM data to storage manager (UI-focused)
+function saveSSMDataToStorage(ssmData) {
+    try {
+        // Extract only the key data shown in the UI
+        const traffic = ssmData.analysisResults.traffic;
+        const competition = ssmData.analysisResults.competition;
+        const land = ssmData.analysisResults.land;
+        const socioEconomic = ssmData.analysisResults.socioEconomic;
+
+        const storageData = {
+            // Basic search parameters
+            searchCoordinates: {
+                latitude: ssmData.coordinates.lat,
+                longitude: ssmData.coordinates.lng,
+                radius: ssmData.coordinates.radius
+            },
+            
+            // Site Classification Result (as shown in UI)
+            siteClassification: {
+                category: ssmData.siteCategory.name, // e.g., "DFA (Dealer Finance A)"
+                categoryCode: ssmData.siteCategory.name.match(/\((.*?)\)/)?.[1] || ssmData.siteCategory.name.split(' ')[0], // e.g., "DFA"
+                totalScore: ssmData.psoScores.totalScore, // e.g., 68
+                siteType: ssmData.siteType.charAt(0).toUpperCase() + ssmData.siteType.slice(1), // e.g., "City"
+                recommendation: ssmData.siteCategory.recommendation, // e.g., "Recommended"  
+                status: ssmData.siteCategory.recommendation, // e.g., "Recommended"
+                categoryLevel: ssmData.siteCategory.description // e.g., "Excellent"
+            },
+            
+            siteType: ssmData.siteType, // "City" or "Highway"
+            siteCategory: ssmData.siteCategory.name, // e.g., "DFA (Dealer Finance A)"
+            overallScore: ssmData.psoScores.totalScore, // e.g., 68
+            recommendation: ssmData.siteCategory.recommendation, // e.g., "Recommended"
+            categoryLevel: ssmData.siteCategory.description, // e.g., "Excellent"
+            
+            // Component Scores (as shown in parameter cards)
+            traffic: {
+                score: `${traffic.score}/${traffic.maxScore}`, // e.g., "27/45"
+                roadClassification: traffic.roadType?.toUpperCase() || 'UNKNOWN', // e.g., "MOTORWAY"
+                trafficDensity: traffic.trafficDensity ? (traffic.trafficDensity > 70 ? 'High' : traffic.trafficDensity > 40 ? 'Medium' : 'Low') : 'Medium'
+            },
+            
+            competition: {
+                score: `${competition.score}/${competition.maxScore}`, // e.g., "5/10"
+                competitorCount: competition.details?.fuelStations || 0, // e.g., 8
+                psoMarketShare: competition.marketSaturation || '0%' // e.g., "0%"
+            },
+            
+            land: {
+                score: `${land.score}/${land.maxScore}`, // e.g., "3/10"
+                accessibility: land.accessibility || 'Unknown',
+                landUseType: land.landUseType || 'Mixed',
+                zoningSuitability: land.zoningSuitability || 'Unknown'
+            },
+            
+            socioEconomic: {
+                score: `${socioEconomic.score}/${socioEconomic.maxScore}`, // e.g., "33/35"
+                populationDensity: socioEconomic.populationDensity || 'Medium',
+                economicLevel: socioEconomic.economicLevel || 'Medium',
+                nfrPotential: socioEconomic.nfrPotential || 'Medium'
+            },
+            
+            // Coordinates for reference
+            coordinates: {
+                center: { 
+                    lat: ssmData.coordinates.lat, 
+                    lng: ssmData.coordinates.lng 
+                },
+                radius: ssmData.coordinates.radius
+            },
+            
+            // Simple recommendations
+            recommendations: extractRecommendations(ssmData),
+            
+            // Basic metadata
+            metadata: {
+                analysisTimestamp: ssmData.timestamp.toISOString(),
+                dataSource: 'OpenStreetMap (OSM) + PSO SSM Model',
+                module: 'ssm',
+                version: '2.0',
+                lastUpdated: new Date().toISOString()
+            }
+        };
+
+        if (window.storageManager) {
+            window.storageManager.setSSMData(storageData);
+            console.log('✅ Essential SSM data saved to storage manager:', storageData);
+        } else {
+            console.warn('⚠️ StorageManager not available, SSM data not saved');
+        }
+    } catch (error) {
+        console.error('❌ Error saving SSM data to storage:', error);
+    }
+}
+
+// Extract recommendations from SSM data
+function extractRecommendations(ssmData) {
+    const recommendations = [];
+    const scores = ssmData.psoScores;
     
-    // Parallel execution of all analysis components
-    const [trafficData, competitionData, landData, socioEconomicData] = await Promise.all([
-        analyzeTrafficNearLocation(lat, lng, radius, siteType),
-        analyzeCompetitionNearLocation(lat, lng, radius),
-        analyzeLandCharacteristics(lat, lng, radius),
-        analyzeSocioEconomicProfile(lat, lng, radius)
-    ]);
+    if (scores.traffic < 20) {
+        recommendations.push('Improve traffic accessibility and road infrastructure');
+    }
+    if (scores.competition < 15) {
+        recommendations.push('Consider market saturation and competitive positioning');
+    }
+    if (scores.land < 15) {
+        recommendations.push('Evaluate land characteristics and development potential');
+    }
+    if (scores.socioEconomic < 20) {
+        recommendations.push('Assess demographic and economic factors');
+    }
+    
+    if (recommendations.length === 0) {
+        recommendations.push('Site shows good potential for PSO fuel station development');
+    }
+    
+    return recommendations;
+}
+
+// Load previous SSM data from storage
+function loadSSMDataFromStorage() {
+    try {
+        // Only try to load if we're on a page that should have SSM elements
+        const hasSSMElements = document.getElementById('ssm-latitude') || 
+                              document.getElementById('ssm-longitude') || 
+                              document.getElementById('ssm-radius');
+        
+        if (!hasSSMElements) {
+            console.log('📍 Skipping SSM storage load - not on SSM page');
+            return false;
+        }
+        
+        if (window.storageManager) {
+            const ssmData = window.storageManager.getSSMData();
+            if (ssmData && ssmData.searchCoordinates) {
+                console.log('📋 Loading previous SSM data from storage:', ssmData);
+                
+                // Restore search coordinates with null checks
+                const latEl = document.getElementById('ssm-latitude');
+                const lngEl = document.getElementById('ssm-longitude');
+                const radiusEl = document.getElementById('ssm-radius');
+                
+                if (latEl) {
+                    latEl.value = ssmData.searchCoordinates.latitude;
+                    console.log('✅ Restored ssm-latitude from storage');
+                }
+                
+                if (lngEl) {
+                    lngEl.value = ssmData.searchCoordinates.longitude;
+                    console.log('✅ Restored ssm-longitude from storage');
+                }
+                
+                if (radiusEl) {
+                    radiusEl.value = ssmData.searchCoordinates.radius;
+                    console.log('✅ Restored ssm-radius from storage');
+                }
+                
+                // Update map view if map exists
+                if (window.map) {
+                    map.setView([ssmData.searchCoordinates.latitude, ssmData.searchCoordinates.longitude], 13);
+                }
+                
+                // Reconstruct current SSM data for display with proper structure
+                if (ssmData.traffic && ssmData.competition && ssmData.land && ssmData.socioEconomic) {
+                    
+                    // Parse scores from string format "27/45" to numbers
+                    const parseScore = (scoreStr) => {
+                        if (typeof scoreStr === 'string' && scoreStr.includes('/')) {
+                            return parseInt(scoreStr.split('/')[0]);
+                        }
+                        return scoreStr || 0;
+                    };
+                    
+                    const parseMaxScore = (scoreStr) => {
+                        if (typeof scoreStr === 'string' && scoreStr.includes('/')) {
+                            return parseInt(scoreStr.split('/')[1]);
+                        }
+                        return scoreStr || 0;
+                    };
+                    
+                    // Reconstruct the data structure that displaySSMResults expects
+                    currentSSMData = {
+                        coordinates: {
+                            lat: ssmData.searchCoordinates.latitude,
+                            lng: ssmData.searchCoordinates.longitude,
+                            radius: ssmData.searchCoordinates.radius
+                        },
+                        siteType: ssmData.siteType || 'city',
+                        analysisResults: {
+                            traffic: {
+                                score: parseScore(ssmData.traffic?.score),
+                                maxScore: parseMaxScore(ssmData.traffic?.score) || (ssmData.siteType === 'highway' ? 60 : 45),
+                                roadType: ssmData.traffic?.roadClassification?.toLowerCase() || 'unknown',
+                                trafficDensity: ssmData.traffic?.trafficDensity || 50,
+                                accessibilityScore: 75,
+                                peakHourFactor: 60,
+                                details: {
+                                    roadClassification: ssmData.traffic?.roadClassification || 'UNKNOWN',
+                                    estimatedDailyTraffic: 50000,
+                                    accessibilityRating: 'Medium'
+                                }
+                            },
+                            competition: {
+                                score: parseScore(ssmData.competition?.score),
+                                maxScore: parseMaxScore(ssmData.competition?.score) || 10,
+                                totalStations: ssmData.competition?.competitorCount || 0,
+                                psoStations: 0,
+                                competitorStations: ssmData.competition?.competitorCount || 0,
+                                marketShare: parseInt(ssmData.competition?.psoMarketShare?.replace('%', '')) || 0,
+                                competitionIntensity: ssmData.competition?.competitorCount || 0,
+                                details: {
+                                    competitionLevel: ssmData.competition?.competitorCount > 5 ? 'High' : 
+                                                    ssmData.competition?.competitorCount > 2 ? 'Medium' : 'Low',
+                                    dominantCompetitors: ['Shell', 'Total', 'Attock']
+                                }
+                            },
+                            land: {
+                                score: parseScore(ssmData.land?.score),
+                                maxScore: parseMaxScore(ssmData.land?.score) || 10,
+                                landUseType: ssmData.land?.landUseType || 'Mixed',
+                                accessibility: 70,
+                                zoningSuitability: 65,
+                                developmentPotential: 60,
+                                details: {
+                                    primaryLandUse: ssmData.land?.landUseType || 'Mixed',
+                                    accessibilityRating: ssmData.land?.accessibility || 'Good',
+                                    developmentFeasibility: 'Medium'
+                                }
+                            },
+                            socioEconomic: {
+                                score: parseScore(ssmData.socioEconomic?.score),
+                                maxScore: parseMaxScore(ssmData.socioEconomic?.score) || (ssmData.siteType === 'highway' ? 20 : 35),
+                                populationDensity: 75,
+                                economicLevel: 65,
+                                vehicleOwnership: 60,
+                                nfrPotential: 70,
+                                details: {
+                                    populationCategory: ssmData.socioEconomic?.populationDensity || 'Medium',
+                                    economicCategory: ssmData.socioEconomic?.economicLevel || 'Medium',
+                                    nfrPotentialRating: ssmData.socioEconomic?.nfrPotential || 'Medium'
+                                }
+                            }
+                        },
+                        psoScores: {
+                            traffic: parseScore(ssmData.traffic?.score),
+                            competition: parseScore(ssmData.competition?.score),
+                            land: parseScore(ssmData.land?.score),
+                            socioEconomic: parseScore(ssmData.socioEconomic?.score),
+                            totalScore: ssmData.overallScore || 0
+                        },
+                        siteCategory: {
+                            name: ssmData.siteCategory || 'Unknown',
+                            description: ssmData.categoryLevel || 'Unknown',
+                            recommendation: ssmData.recommendation || 'Unknown',
+                            color: determineCategoryColor(ssmData.siteCategory)
+                        },
+                        timestamp: new Date(ssmData.metadata?.analysisTimestamp || Date.now())
+                    };
+                    
+                    console.log('🔄 Reconstructed SSM data for display:', currentSSMData);
+                    
+                    // Display the loaded results
+                    displaySSMResults(currentSSMData);
+                } else {
+                    console.log('⚠️ Incomplete SSM data in storage, skipping display');
+                }
+                
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('❌ Error loading SSM data from storage:', error);
+        return false;
+    }
+}
+
+// Helper function to determine category color
+function determineCategoryColor(categoryName) {
+    if (!categoryName) return 'category-dfc';
+    
+    if (categoryName.includes('CF')) return 'category-cf';
+    if (categoryName.includes('DFA')) return 'category-dfa';
+    if (categoryName.includes('DFB')) return 'category-dfb';
+    return 'category-dfc';
+}
+
+// Execute Comprehensive Analysis with Sequential Processing and Progress Updates
+async function executeComprehensiveAnalysis(lat, lng, radius, siteType) {
+    console.log('📊 Executing comprehensive analysis with rate limiting...');
+    
+    // Update loading button with progress
+    const btn = document.getElementById('analyzeSSMBtn');
+    
+    // Sequential execution to avoid rate limiting issues
+    console.log('🚗 Step 1/4: Analyzing traffic infrastructure...');
+    btn.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+        <span>Step 1/4: Traffic Analysis...</span>
+    `;
+    const trafficData = await analyzeTrafficNearLocation(lat, lng, radius, siteType);
+    
+    console.log('🏪 Step 2/4: Analyzing competition landscape...');
+    btn.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+        <span>Step 2/4: Competition Analysis...</span>
+    `;
+    const competitionData = await analyzeCompetitionNearLocation(lat, lng, radius);
+    
+    console.log('🗺️ Step 3/4: Analyzing land characteristics...');
+    btn.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+        <span>Step 3/4: Land Analysis...</span>
+    `;
+    const landData = await analyzeLandCharacteristics(lat, lng, radius);
+    
+    console.log('👥 Step 4/4: Analyzing socio-economic profile...');
+    btn.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+        <span>Step 4/4: Socio-Economic Analysis...</span>
+    `;
+    const socioEconomicData = await analyzeSocioEconomicProfile(lat, lng, radius);
+    
+    btn.innerHTML = `
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+        <span>Finalizing Results...</span>
+    `;
+    
+    console.log('✅ All analysis steps completed successfully');
     
     return {
         traffic: trafficData,
@@ -1891,15 +2466,20 @@ function initializeFromURL() {
     const siteType = urlParams.get('siteType');
     
     if (lat && lng) {
-        document.getElementById('ssm-latitude').value = lat;
-        document.getElementById('ssm-longitude').value = lng;
+        const latEl = document.getElementById('ssm-latitude');
+        const lngEl = document.getElementById('ssm-longitude');
+        const radiusEl = document.getElementById('ssm-radius');
         
-        if (radius) {
-            document.getElementById('ssm-radius').value = radius;
+        if (latEl) latEl.value = lat;
+        if (lngEl) lngEl.value = lng;
+        
+        if (radius && radiusEl) {
+            radiusEl.value = radius;
         }
         
         if (siteType && (siteType === 'city' || siteType === 'highway')) {
-            document.querySelector(`input[name="siteType"][value="${siteType}"]`).checked = true;
+            const siteTypeEl = document.querySelector(`input[name="siteType"][value="${siteType}"]`);
+            if (siteTypeEl) siteTypeEl.checked = true;
         }
         
         // Auto-analyze if all parameters are present
@@ -2122,8 +2702,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     loadCoordinatesFromCookies();
    
-    document.getElementById('ssm-latitude').addEventListener('input', validatePakistanCoordinates);
-    document.getElementById('ssm-longitude').addEventListener('input', validatePakistanCoordinates);
+    // Add event listeners with null checks
+    const latEl = document.getElementById('ssm-latitude');
+    const lngEl = document.getElementById('ssm-longitude');
+    
+    if (latEl) {
+        latEl.addEventListener('input', validatePakistanCoordinates);
+        console.log('✅ Added event listener to ssm-latitude');
+    } else {
+        console.warn('⚠️ ssm-latitude element not found for event listener');
+    }
+    
+    if (lngEl) {
+        lngEl.addEventListener('input', validatePakistanCoordinates);
+        console.log('✅ Added event listener to ssm-longitude');
+    } else {
+        console.warn('⚠️ ssm-longitude element not found for event listener');
+    }
     
     // Try to sync coordinates from map
     // syncCoordinatesFromMap();
@@ -2142,3 +2737,475 @@ document.addEventListener('DOMContentLoaded', function() {
 window.performSSMAnalysis = performSSMAnalysis;
 window.exportSSMResults = exportSSMResults;
 window.printSSMReport = printSSMReport;
+window.performSSMAnalysisForStorage = performSSMAnalysisForStorage;
+
+// Simplified SSM analysis for storage manager (no HTML/UI dependencies)
+async function performSSMAnalysisForStorage(lat, lng, radius) {
+    try {
+        console.log(`🔍 Performing SSM analysis for storage: ${lat}, ${lng}, radius: ${radius}km`);
+        
+        // Auto-detect site type
+        const siteType = autoDetectSiteType(lat, lng);
+        
+        // Perform all analysis steps
+        const analysisResults = await executeComprehensiveAnalysisForStorage(lat, lng, radius, siteType);
+        
+        // Calculate PSO scores
+        const psoScores = calculatePSOScores(analysisResults, siteType);
+        
+        // Determine site category
+        const siteCategory = determineSiteCategory(psoScores.totalScore);
+        
+        // Create comprehensive SSM data
+        const ssmData = {
+            searchCoordinates: {
+                latitude: lat,
+                longitude: lng,
+                radius: radius
+            },
+            siteClassification: {
+                category: siteCategory.name,
+                categoryCode: siteCategory.name.match(/\((.*?)\)/)?.[1] || siteCategory.name.split(' ')[0],
+                totalScore: psoScores.totalScore,
+                siteType: siteType.charAt(0).toUpperCase() + siteType.slice(1),
+                recommendation: siteCategory.recommendation,
+                status: siteCategory.recommendation,
+                categoryLevel: siteCategory.description
+            },
+            siteType: siteType,
+            siteCategory: siteCategory.name,
+            overallScore: psoScores.totalScore,
+            recommendation: siteCategory.recommendation,
+            categoryLevel: siteCategory.description,
+            traffic: {
+                score: `${analysisResults.traffic.score}/${analysisResults.traffic.maxScore}`,
+                roadClassification: analysisResults.traffic.roadType?.toUpperCase() || 'UNKNOWN',
+                trafficDensity: analysisResults.traffic.trafficDensity > 70 ? 'High' : 
+                               analysisResults.traffic.trafficDensity > 40 ? 'Medium' : 'Low'
+            },
+            competition: {
+                score: `${analysisResults.competition.score}/${analysisResults.competition.maxScore}`,
+                competitorCount: analysisResults.competition.competitorStations || 0,
+                psoMarketShare: analysisResults.competition.marketShare ? `${analysisResults.competition.marketShare}%` : '0%'
+            },
+            land: {
+                score: `${analysisResults.land.score}/${analysisResults.land.maxScore}`,
+                accessibility: analysisResults.land.accessibility || 'Unknown',
+                landUseType: analysisResults.land.landUseType || 'Mixed',
+                zoningSuitability: analysisResults.land.zoningSuitability || 'Unknown'
+            },
+            socioEconomic: {
+                score: `${analysisResults.socioEconomic.score}/${analysisResults.socioEconomic.maxScore}`,
+                populationDensity: analysisResults.socioEconomic.populationDensity || 'Medium',
+                economicLevel: analysisResults.socioEconomic.economicLevel || 'Medium',
+                nfrPotential: analysisResults.socioEconomic.nfrPotential || 'Medium'
+            },
+            coordinates: {
+                center: { lat, lng },
+                radius: radius
+            },
+            recommendations: extractRecommendationsFromResults(analysisResults, psoScores),
+            metadata: {
+                source: 'Auto-generated via Storage Manager',
+                analysisTimestamp: new Date().toISOString(),
+                dataSource: 'OpenStreetMap (OSM) + PSO SSM Model',
+                module: 'ssm',
+                version: '2.0',
+                lastUpdated: new Date().toISOString()
+            }
+        };
+
+        console.log(`✅ SSM analysis completed for storage:`, ssmData);
+        return ssmData;
+
+    } catch (error) {
+        console.error('❌ Error performing SSM analysis for storage:', error);
+        
+        // Return minimal fallback data
+        return {
+            searchCoordinates: { latitude: lat, longitude: lng, radius: radius },
+            siteClassification: {
+                category: 'DFC (Dealer Finance C)',
+                categoryCode: 'DFC',
+                totalScore: 30,
+                siteType: 'City',
+                recommendation: 'Not Recommended',
+                status: 'Not Recommended',
+                categoryLevel: 'Poor'
+            },
+            siteType: 'city',
+            siteCategory: 'DFC (Dealer Finance C)',
+            overallScore: 30,
+            recommendation: 'Not Recommended',
+            categoryLevel: 'Poor',
+            traffic: { score: '10/45', roadClassification: 'UNKNOWN', trafficDensity: 'Low' },
+            competition: { score: '5/10', competitorCount: 0, psoMarketShare: '0%' },
+            land: { score: '5/10', accessibility: 'Unknown', landUseType: 'Mixed', zoningSuitability: 'Unknown' },
+            socioEconomic: { score: '10/35', populationDensity: 'Medium', economicLevel: 'Medium', nfrPotential: 'Medium' },
+            coordinates: { center: { lat, lng }, radius: radius },
+            recommendations: ['Site requires comprehensive evaluation before consideration'],
+            metadata: {
+                source: 'Fallback data - Auto-generated via Storage Manager',
+                analysisTimestamp: new Date().toISOString(),
+                dataSource: 'Fallback Data',
+                module: 'ssm',
+                version: '2.0',
+                lastUpdated: new Date().toISOString()
+            }
+        };
+    }
+}
+
+// Simplified comprehensive analysis for storage (no UI updates)
+async function executeComprehensiveAnalysisForStorage(lat, lng, radius, siteType) {
+    console.log('📊 Executing comprehensive analysis for storage...');
+    
+    // Sequential execution with simplified progress logging
+    console.log('🚗 Step 1/4: Analyzing traffic infrastructure...');
+    const trafficData = await analyzeTrafficNearLocation(lat, lng, radius, siteType);
+    
+    console.log('🏪 Step 2/4: Analyzing competition landscape...');
+    const competitionData = await analyzeCompetitionNearLocation(lat, lng, radius);
+    
+    console.log('🗺️ Step 3/4: Analyzing land characteristics...');
+    const landData = await analyzeLandCharacteristics(lat, lng, radius);
+    
+    console.log('👥 Step 4/4: Analyzing socio-economic profile...');
+    const socioEconomicData = await analyzeSocioEconomicProfile(lat, lng, radius);
+    
+    console.log('✅ All analysis steps completed for storage');
+    
+    return {
+        traffic: trafficData,
+        competition: competitionData,
+        land: landData,
+        socioEconomic: socioEconomicData
+    };
+}
+
+// Extract recommendations from analysis results
+function extractRecommendationsFromResults(analysisResults, psoScores) {
+    const recommendations = [];
+    
+    if (psoScores.traffic < 20) {
+        recommendations.push('Improve traffic accessibility and road infrastructure');
+    }
+    if (psoScores.competition < 15) {
+        recommendations.push('Consider market saturation and competitive positioning');
+    }
+    if (psoScores.land < 15) {
+        recommendations.push('Evaluate land characteristics and development potential');
+    }
+    if (psoScores.socioEconomic < 20) {
+        recommendations.push('Assess demographic and economic factors');
+    }
+    
+    if (recommendations.length === 0) {
+        recommendations.push('Site shows good potential for PSO fuel station development');
+    }
+    
+    return recommendations;
+}
+
+// ========================================
+// COOKIE AND AUTO-GENERATION FUNCTIONS
+// ========================================
+
+// Function to set cookie value
+function setCookie(name, value, days = 30) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+}
+
+// Auto-generate all data function
+async function autoGenerateAllData() {
+    try {
+        const latitude = parseFloat(document.getElementById('auto-latitude').value);
+        const longitude = parseFloat(document.getElementById('auto-longitude').value);
+        const radius = parseFloat(document.getElementById('auto-radius').value);
+        
+        if (!latitude || !longitude || !radius) {
+            showToast('❌ Please enter valid coordinates and radius', 'error');
+            return;
+        }
+        
+        // Update button state
+        const button = document.getElementById('autoGenerateBtn');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner animate-spin mr-2"></i>Generating Data...';
+        button.disabled = true;
+        
+        console.log('🚀 Starting auto-generation for coordinates:', { latitude, longitude, radius });
+        
+        // Save coordinates to cookies
+        setCookie('map_latitude', latitude);
+        setCookie('map_longitude', longitude);
+        setCookie('map_radius', radius);
+        
+        // Update main SSM inputs
+        document.getElementById('ssm-latitude').value = latitude;
+        document.getElementById('ssm-longitude').value = longitude;
+        document.getElementById('ssm-radius').value = radius;
+        
+        // Step 1: Generate Map Data (simulate map.js functionality)
+        showToast('📍 Generating map data...', 'info');
+        const mapData = await generateMapData(latitude, longitude, radius);
+        
+        // Step 2: Generate Analysis Data (simulate analysis.js functionality) 
+        showToast('🏗️ Generating analysis data...', 'info');
+        const analysisData = await generateAnalysisData(latitude, longitude, radius);
+        
+        // Step 3: Generate SSM Data - use the existing SSM analysis
+        showToast('📊 Generating SSM data...', 'info');
+        await performSSMAnalysis(); // Use existing SSM analysis
+        
+        // Save all data using storage manager
+        if (window.storageManager) {
+            window.storageManager.setMapData(mapData);
+            window.storageManager.setAnalysisData(analysisData);
+        }
+        
+        showToast('✅ All data generated successfully!', 'success');
+        
+        // Reset button
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+    } catch (error) {
+        console.error('❌ Error in auto-generation:', error);
+        showToast('❌ Error generating data: ' + error.message, 'error');
+        
+        // Reset button
+        const button = document.getElementById('autoGenerateBtn');
+        button.innerHTML = '<i class="fas fa-bolt mr-2"></i>Auto Generate All Data';
+        button.disabled = false;
+    }
+}
+
+// Generate map data (simplified version of map.js functionality)
+async function generateMapData(latitude, longitude, radius) {
+    try {
+        const stations = await fetchOSMData(latitude, longitude, radius, `
+            [out:json][timeout:25];
+            (
+                nwr["amenity"="fuel"](around:${radius * 1000},${latitude},${longitude});
+            );
+            out center;
+        `);
+        
+        const processedStations = stations.map(station => ({
+            id: station.id,
+            name: station.tags?.name || 'Fuel Station',
+            brand: station.tags?.brand || 'Unknown',
+            type: station.tags?.fuel || 'Unknown',
+            coordinates: {
+                lat: station.lat || station.center?.lat,
+                lng: station.lon || station.center?.lon
+            },
+            distance: calculateDistance(latitude, longitude, 
+                station.lat || station.center?.lat, 
+                station.lon || station.center?.lon)
+        }));
+        
+        return {
+            stations: processedStations,
+            coordinates: { latitude, longitude, radius },
+            searchRadius: radius,
+            totalStations: processedStations.length,
+            psoStations: processedStations.filter(s => s.brand?.toLowerCase().includes('pso')).length,
+            competitorStations: processedStations.filter(s => !s.brand?.toLowerCase().includes('pso')).length,
+            metadata: {
+                source: 'Auto-Generated via SSM',
+                generatedAt: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        console.error('❌ Error generating map data:', error);
+        return {
+            stations: [],
+            coordinates: { latitude, longitude, radius },
+            searchRadius: radius,
+            totalStations: 0,
+            psoStations: 0,
+            competitorStations: 0,
+            metadata: {
+                source: 'Auto-Generated via SSM (Fallback)',
+                generatedAt: new Date().toISOString()
+            }
+        };
+    }
+}
+
+// Generate analysis data (simplified version of analysis.js functionality)
+async function generateAnalysisData(latitude, longitude, radius) {
+    try {
+        const landUseData = await fetchOSMData(latitude, longitude, radius, `
+            [out:json][timeout:25];
+            (
+                way["landuse"](around:${radius * 1000},${latitude},${longitude});
+                relation["landuse"](around:${radius * 1000},${latitude},${longitude});
+            );
+            out geom;
+        `);
+        
+        const amenityData = await fetchOSMData(latitude, longitude, radius, `
+            [out:json][timeout:25];
+            (
+                nwr["amenity"](around:${radius * 1000},${latitude},${longitude});
+            );
+            out center;
+        `);
+        
+        // Process land use data
+        const landUseCounts = {};
+        landUseData.forEach(element => {
+            const landUse = element.tags?.landuse || 'unknown';
+            landUseCounts[landUse] = (landUseCounts[landUse] || 0) + 1;
+        });
+        
+        const dominantLandUse = Object.keys(landUseCounts).reduce((a, b) => 
+            landUseCounts[a] > landUseCounts[b] ? a : b, 'mixed');
+        
+        return {
+            siteType: determineSiteType(dominantLandUse, amenityData.length),
+            dominantLandUse: dominantLandUse,
+            totalElements: landUseData.length + amenityData.length,
+            coordinates: { latitude, longitude, radius },
+            landUse: {
+                counts: landUseCounts,
+                percentages: calculatePercentages(landUseCounts)
+            },
+            amenities: processAmenities(amenityData),
+            metadata: {
+                source: 'Auto-Generated via SSM',
+                generatedAt: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        console.error('❌ Error generating analysis data:', error);
+        return {
+            siteType: 'Urban Commercial',
+            dominantLandUse: 'commercial',
+            totalElements: 0,
+            coordinates: { latitude, longitude, radius },
+            landUse: { counts: {}, percentages: {} },
+            amenities: {},
+            metadata: {
+                source: 'Auto-Generated via SSM (Fallback)',
+                generatedAt: new Date().toISOString()
+            }
+        };
+    }
+}
+
+// Helper functions
+function determineSiteType(dominantLandUse, amenityCount) {
+    if (dominantLandUse.includes('commercial') || amenityCount > 50) return 'Urban Commercial';
+    if (dominantLandUse.includes('residential')) return 'Urban Residential'; 
+    if (dominantLandUse.includes('industrial')) return 'Industrial';
+    return 'Mixed Urban';
+}
+
+function calculatePercentages(counts) {
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    const percentages = {};
+    for (const [key, value] of Object.entries(counts)) {
+        percentages[key] = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+    }
+    return percentages;
+}
+
+function processAmenities(amenityData) {
+    const amenityTypes = {};
+    amenityData.forEach(amenity => {
+        const type = amenity.tags?.amenity || 'unknown';
+        amenityTypes[type] = (amenityTypes[type] || 0) + 1;
+    });
+    return amenityTypes;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Simple toast notification function
+function showToast(message, type = 'info') {
+    // Try using Toastify if available
+    if (typeof Toastify !== 'undefined') {
+        const bgColors = {
+            success: 'bg-gradient-to-r from-green-800 to-green-700',
+            error: 'bg-gradient-to-r from-red-800 to-red-700', 
+            warning: 'bg-gradient-to-r from-yellow-800 to-yellow-700',
+            info: 'bg-gradient-to-r from-blue-800 to-blue-700'
+        };
+        
+        Toastify({
+            text: message,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            offset: {
+                y: 80
+            },
+            className: `${bgColors[type] || bgColors.info} text-white rounded-lg shadow-lg font-medium text-sm`,
+            stopOnFocus: true
+        }).showToast();
+    } else {
+        // Fallback: simple console log and basic notification
+        console.log(`📢 ${message}`);
+        
+        // Create simple toast element
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-[1000] transition-all duration-300 transform translate-x-full`;
+        
+        const bgColors = {
+            success: 'bg-green-600',
+            error: 'bg-red-600', 
+            warning: 'bg-yellow-600',
+            info: 'bg-blue-600'
+        };
+        
+        toast.className += ` ${bgColors[type] || bgColors.info}`;
+        toast.textContent = message;
+        
+        document.body.appendChild(toast);
+        
+        // Show animation
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full');
+        }, 100);
+        
+        // Hide after 3 seconds
+        setTimeout(() => {
+            toast.classList.add('translate-x-full');
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+}
+
+// Export functions globally for storage manager
+window.performSSMAnalysis = performSSMAnalysis;
+window.loadCoordinatesFromCookies = loadCoordinatesFromCookies;
+window.autoGenerateAllData = autoGenerateAllData;
+
+console.log('🎯 SSM functions exported globally:', {
+    performSSMAnalysis: typeof performSSMAnalysis,
+    loadCoordinatesFromCookies: typeof loadCoordinatesFromCookies,
+    autoGenerateAllData: typeof autoGenerateAllData
+});
+
+console.log('🎯 SSM functions exported globally:', {
+    performSSMAnalysis: typeof performSSMAnalysis
+});

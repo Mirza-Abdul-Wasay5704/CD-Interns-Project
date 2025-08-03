@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test HTML-to-PDF Report Generation</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-button {
+            background: linear-gradient(135deg, #1c5e3b, #2a7549);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(28, 94, 59, 0.3);
+        }
+        .status-area {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 100px;
+        }
+        .mock-data-info {
+            background: #e7f3ff;
+            border-left: 4px solid #007acc;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 PSO Report Generation Testing</h1>
+        <p>This page allows you to test the new HTML-to-PDF report generation system.</p>
+        
+        <div class="mock-data-info">
+            <h3>📊 Test Configuration</h3>
+            <p>This test will generate mock data to validate the complete PDF generation pipeline including:</p>
+            <ul>
+                <li>✅ HTML template generation with professional PSO styling</li>
+                <li>✅ Chart data preparation and HTML rendering</li>
+                <li>✅ Multi-page layout with headers and footers</li>
+                <li>✅ CSS-based responsive design</li>
+                <li>✅ Modern html2pdf.js conversion</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="test-button" onclick="loadMockData()">
+                📝 Load Mock Analysis Data
+            </button>
+            <button class="test-button" onclick="testReportGeneration()">
+                📄 Generate Test Report
+            </button>
+            <button class="test-button" onclick="clearTestData()">
+                🗑️ Clear Test Data
+            </button>
+        </div>
+
+        <div class="status-area" id="statusArea">
+            <p><strong>Status:</strong> Ready for testing</p>
+            <p>Click "Load Mock Data" first, then "Generate Test Report" to test the new system.</p>
+        </div>
+    </div>
+
+    <!-- Load our storage manager -->
+    <script src="storage-manager.js"></script>
+    
+    <script>
+        function updateStatus(message, type = 'info') {
+            const statusArea = document.getElementById('statusArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '📝';
+            
+            statusArea.innerHTML += `<p><strong>[${timestamp}]</strong> ${icon} ${message}</p>`;
+            statusArea.scrollTop = statusArea.scrollHeight;
+        }
+
+        function loadMockData() {
+            updateStatus('Loading comprehensive mock analysis data...');
+            
+            try {
+                // Create comprehensive mock data for testing
+                const mockMapData = {
+                    center: { lat: 24.8607, lng: 67.0011 }, // Karachi coordinates
+                    zoom: 12,
+                    coordinates: {
+                        latitude: 24.8607,
+                        longitude: 67.0011,
+                        radius: 5000
+                    },
+                    searchRadius: 5000,
+                    totalStations: 12,
+                    stations: [
+                        { name: "PSO Station Clifton", brand: "PSO", lat: 24.8650, lng: 67.0050, distance: 1.2 },
+                        { name: "PSO Station DHA", brand: "PSO", lat: 24.8580, lng: 66.9980, distance: 2.8 },
+                        { name: "Shell Station Main", brand: "Shell", lat: 24.8620, lng: 67.0030, distance: 1.8 },
+                        { name: "Total Parco Station", brand: "Total", lat: 24.8590, lng: 67.0020, distance: 1.5 },
+                        { name: "Caltex Station", brand: "Caltex", lat: 24.8630, lng: 67.0040, distance: 1.9 },
+                        { name: "GO Station", brand: "GO", lat: 24.8570, lng: 66.9990, distance: 2.1 },
+                        { name: "Hascol Station", brand: "Hascol", lat: 24.8610, lng: 67.0010, distance: 1.0 },
+                        { name: "Byco Station", brand: "Byco", lat: 24.8640, lng: 67.0060, distance: 2.5 },
+                        { name: "Attock Station", brand: "Attock", lat: 24.8560, lng: 66.9970, distance: 3.2 },
+                        { name: "Shell Station 2", brand: "Shell", lat: 24.8670, lng: 67.0070, distance: 2.9 },
+                        { name: "Total Station 2", brand: "Total", lat: 24.8530, lng: 66.9950, distance: 3.8 },
+                        { name: "Caltex Station 2", brand: "Caltex", lat: 24.8690, lng: 67.0080, distance: 3.1 }
+                    ],
+                    brandCounts: {
+                        "PSO": 2,
+                        "Shell": 2, 
+                        "Total": 2,
+                        "Caltex": 2,
+                        "GO": 1,
+                        "Hascol": 1,
+                        "Byco": 1,
+                        "Attock": 1
+                    },
+                    marketAnalysis: {
+                        competitionLevel: 'High',
+                        marketOpportunity: { score: 75 },
+                        psoMarketShare: 16.7
+                    },
+                    metadata: {
+                        lastUpdated: new Date().toISOString()
+                    }
+                };
+
+                const mockAnalysisData = {
+                    searchCoordinates: {
+                        latitude: 24.8607,
+                        longitude: 67.0011,
+                        radius: 5000
+                    },
+                    dominantLandUse: 'Commercial',
+                    landUse: {
+                        counts: {
+                            'residential': 142,
+                            'commercial': 89,
+                            'industrial': 34,
+                            'mixed': 67,
+                            'institutional': 23,
+                            'recreational': 15
+                        },
+                        percentages: {
+                            'residential': 38.4,
+                            'commercial': 24.1,
+                            'industrial': 9.2,
+                            'mixed': 18.1,
+                            'institutional': 6.2,
+                            'recreational': 4.1
+                        }
+                    },
+                    metadata: {
+                        lastUpdated: new Date().toISOString()
+                    }
+                };
+
+                const mockSSMData = {
+                    searchCoordinates: {
+                        latitude: 24.8607,
+                        longitude: 67.0011,
+                        radius: 5000
+                    },
+                    overallScore: 86,
+                    recommendation: 'Highly Recommended',
+                    siteCategory: 'Premium Commercial',
+                    metadata: {
+                        lastUpdated: new Date().toISOString()
+                    }
+                };
+
+                // Store all mock data
+                window.storageManager.setMapData(mockMapData);
+                window.storageManager.setAnalysisData(mockAnalysisData);
+                window.storageManager.setSSMData(mockSSMData);
+
+                updateStatus('Mock data loaded successfully! All modules populated with comprehensive test data.', 'success');
+                updateStatus(`Map Data: ✅ ${mockMapData.totalStations} stations, ${Object.keys(mockMapData.brandCounts).length} brands`);
+                updateStatus(`Analysis Data: ✅ Land use analysis with ${Object.keys(mockAnalysisData.landUse.counts).length} categories`);
+                updateStatus(`SSM Data: ✅ Overall Score ${mockSSMData.overallScore}%, ${mockSSMData.recommendation}`);
+                updateStatus('🎯 Data is now ready for professional PSO report generation!');
+                
+            } catch (error) {
+                updateStatus(`Error loading mock data: ${error.message}`, 'error');
+                console.error('Mock data loading error:', error);
+            }
+        }
+
+        function testReportGeneration() {
+            updateStatus('Starting PDF report generation test...');
+            
+            try {
+                // Check if we have data
+                if (!window.storageManager.hasMapData() || !window.storageManager.hasAnalysisData()) {
+                    updateStatus('No test data found! Please load mock data first.', 'error');
+                    return;
+                }
+
+                updateStatus('Data validation passed. Initiating HTML-to-PDF generation...');
+                
+                // Call the generateReport function
+                window.generateReport();
+                
+                updateStatus('Report generation initiated! Watch for the loading modal and success dialog.', 'success');
+                
+            } catch (error) {
+                updateStatus(`Error generating report: ${error.message}`, 'error');
+                console.error('Report generation error:', error);
+            }
+        }
+
+        function clearTestData() {
+            updateStatus('Clearing all test data...');
+            
+            try {
+                window.storageManager.clearData('all');
+                updateStatus('All test data cleared successfully!', 'success');
+            } catch (error) {
+                updateStatus(`Error clearing data: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize
+        updateStatus('Test page loaded. Storage Manager ready.');
+        updateStatus('HTML-to-PDF report generation system loaded.');
+    </script>
+</body>
+</html>

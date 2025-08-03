@@ -115,213 +115,270 @@
                         <a href="ssm.html"
                             class="block py-3 px-4 text-yellow-400 bg-gray-700 rounded md:bg-transparent md:p-0 transition-all duration-300 hover:text-yellow-300">SSM</a>
                     </li>
+                    <li>
+                        <a href="storage-manager.html"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Storage</a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="max-w-screen-xl mx-auto px-4 py-6">
+    <div class="max-w-screen-xl mx-auto px-4 py-8">
+
+        <!-- Hero Section -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white mb-4">
+                <span class="text-yellow-400">Site Selection</span> 
+                <span class="text-white">Metrics</span>
+            </h1>
+            <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                Advanced AI-powered analysis to evaluate optimal fuel station locations based on 
+                traffic patterns, competition, land classification, and socio-economic factors
+            </p>
+        </div>
 
         <!-- Site Parameters Section -->
-        <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6 mb-6">
-            <div class="flex items-center mb-6">
-                <i class="fas fa-chart-line text-blue-400 text-xl mr-3"></i>
-                <h2 class="text-2xl font-bold text-white">Site Selection Parameters</h2>
+        <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 mb-8 shadow-2xl">
+            <div class="flex items-center mb-8">
+                <div class="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mr-4">
+                    <i class="fas fa-chart-line text-blue-400 text-2xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-bold text-white">Site Selection Parameters</h2>
+                    <p class="text-gray-400 mt-1">Configure location coordinates and analysis radius</p>
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                 <!-- Latitude -->
-                <div>
-                    <label class="flex items-center text-green-400 text-sm font-medium mb-2">
-                        <i class="fas fa-map-marker-alt mr-2"></i>
+                <div class="group">
+                    <label class="flex items-center text-green-400 text-sm font-semibold mb-3 group-hover:text-green-300 transition-colors">
+                        <div class="w-6 h-6 bg-green-500/20 rounded-lg flex items-center justify-center mr-2">
+                            <i class="fas fa-map-marker-alt text-xs"></i>
+                        </div>
                         Latitude
                     </label>
-                    <input type="number" id="ssm-latitude" step="any" value="24.848376"
-                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all duration-300">
+                    <input type="number" id="ssm-latitude" step="any" value="24.8607"
+                        class="w-full px-5 py-4 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300 hover:bg-gray-700/70 text-lg font-medium">
                 </div>
 
                 <!-- Longitude -->
-                <div>
-                    <label class="flex items-center text-green-400 text-sm font-medium mb-2">
-                        <i class="fas fa-map-marker-alt mr-2"></i>
+                <div class="group">
+                    <label class="flex items-center text-green-400 text-sm font-semibold mb-3 group-hover:text-green-300 transition-colors">
+                        <div class="w-6 h-6 bg-green-500/20 rounded-lg flex items-center justify-center mr-2">
+                            <i class="fas fa-map-marker-alt text-xs"></i>
+                        </div>
                         Longitude
                     </label>
-                    <input type="number" id="ssm-longitude" step="any" value="67.113880"
-                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all duration-300">
+                    <input type="number" id="ssm-longitude" step="any" value="67.0011"
+                        class="w-full px-5 py-4 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300 hover:bg-gray-700/70 text-lg font-medium">
                 </div>
 
                 <!-- Analysis Radius -->
-                <div>
-                    <label class="flex items-center text-green-400 text-sm font-medium mb-2">
-                        <i class="fas fa-circle-notch mr-2"></i>
-                        Radius (km)
+                <div class="group">
+                    <label class="flex items-center text-green-400 text-sm font-semibold mb-3 group-hover:text-green-300 transition-colors">
+                        <div class="w-6 h-6 bg-green-500/20 rounded-lg flex items-center justify-center mr-2">
+                            <i class="fas fa-circle-notch text-xs"></i>
+                        </div>
+                        Analysis Radius (km)
                     </label>
                     <input type="number" id="ssm-radius" value="2" min="0.5" max="5" step="0.5"
-                        class="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-all duration-300">
+                        class="w-full px-5 py-4 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-300 hover:bg-gray-700/70 text-lg font-medium">
                 </div>
             </div>
 
+            <!-- Auto Generate Missing Data Section -->
+           
             <!-- Action Button -->
-            <div class="flex flex-wrap gap-4">
+            <div class="flex justify-center">
                 <button id="analyzeSSMBtn" onclick="performSSMAnalysis()"
-                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center">
-                    <i class="fas fa-chart-line mr-2"></i>
-                    Analyze Site
+                    class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-12 py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center shadow-lg hover:shadow-green-500/25 transform hover:scale-105">
+                    <i class="fas fa-chart-line mr-3 text-xl"></i>
+                    <span>Analyze Site Location</span>
+                    <div class="ml-3 w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin hidden" id="analyzeSpinner"></div>
                 </button>
             </div>
         </div>
 
         <!-- Site Classification Result -->
-        <div id="classificationResult" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8 mb-8">
-            <div class="text-center mb-8">
-                <h2 class="text-3xl font-bold text-white mb-6">Site Classification Result</h2>
+        <div id="classificationResult" class="hidden bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-10 mb-10 shadow-2xl">
+            <div class="text-center mb-10">
+                <h2 class="text-4xl font-bold text-white mb-8">
+                    <i class="fas fa-trophy text-yellow-400 mr-3"></i>
+                    Site Classification Result
+                </h2>
                 
                 <!-- Category Badge -->
-                <div id="categoryBadge" class="inline-block px-12 py-6 rounded-2xl text-white font-bold text-3xl mb-6 pulse-animation">
+                <div id="categoryBadge" class="inline-block px-16 py-8 rounded-3xl text-white font-black text-4xl mb-8 pulse-animation shadow-2xl">
                     <!-- Dynamic category badge -->
                 </div>
                 
                 <!-- Key Metrics Display -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-8">
-                    <div class="bg-gray-700/30 rounded-xl p-6 text-center">
-                        <div id="totalScore" class="text-4xl font-black text-yellow-400 mb-2">0</div>
-                        <div class="text-sm text-gray-300 font-medium">Total Score</div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mt-10">
+                    <div class="bg-gradient-to-br from-gray-700/50 to-gray-800/50 rounded-2xl p-8 text-center border border-gray-600/30 hover:border-yellow-400/50 transition-all duration-300 group">
+                        <div class="w-16 h-16 bg-yellow-400/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-star text-yellow-400 text-2xl"></i>
+                        </div>
+                        <div id="totalScore" class="text-5xl font-black text-yellow-400 mb-3">0</div>
+                        <div class="text-sm text-gray-300 font-semibold uppercase tracking-wide">Total Score</div>
                     </div>
-                    <div class="bg-gray-700/30 rounded-xl p-6 text-center">
-                        <div id="siteTypeDisplay" class="text-2xl font-bold text-blue-400 mb-2">City</div>
-                        <div class="text-sm text-gray-300 font-medium">Site Type</div>
+                    <div class="bg-gradient-to-br from-gray-700/50 to-gray-800/50 rounded-2xl p-8 text-center border border-gray-600/30 hover:border-blue-400/50 transition-all duration-300 group">
+                        <div class="w-16 h-16 bg-blue-400/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-map-marked-alt text-blue-400 text-2xl"></i>
+                        </div>
+                        <div id="siteTypeDisplay" class="text-2xl font-bold text-blue-400 mb-3">City</div>
+                        <div class="text-sm text-gray-300 font-semibold uppercase tracking-wide">Site Type</div>
                     </div>
-                    <div class="bg-gray-700/30 rounded-xl p-6 text-center">
-                        <div id="recommendation" class="text-lg font-semibold text-green-400 mb-2">Recommended</div>
-                        <div class="text-sm text-gray-300 font-medium">Status</div>
+                    <div class="bg-gradient-to-br from-gray-700/50 to-gray-800/50 rounded-2xl p-8 text-center border border-gray-600/30 hover:border-green-400/50 transition-all duration-300 group">
+                        <div class="w-16 h-16 bg-green-400/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-check-circle text-green-400 text-2xl"></i>
+                        </div>
+                        <div id="recommendation" class="text-lg font-semibold text-green-400 mb-3">Recommended</div>
+                        <div class="text-sm text-gray-300 font-semibold uppercase tracking-wide">Status</div>
                     </div>
-                    <div class="bg-gray-700/30 rounded-xl p-6 text-center">
-                        <div id="categoryDescription" class="text-lg font-semibold text-purple-400 mb-2">Premium</div>
-                        <div class="text-sm text-gray-300 font-medium">Category Level</div>
+                    <div class="bg-gradient-to-br from-gray-700/50 to-gray-800/50 rounded-2xl p-8 text-center border border-gray-600/30 hover:border-purple-400/50 transition-all duration-300 group">
+                        <div class="w-16 h-16 bg-purple-400/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-crown text-purple-400 text-2xl"></i>
+                        </div>
+                        <div id="categoryDescription" class="text-lg font-semibold text-purple-400 mb-3">Premium</div>
+                        <div class="text-sm text-gray-300 font-semibold uppercase tracking-wide">Category Level</div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Detailed Parameter Analysis -->
-        <div id="parameterAnalysis" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div id="parameterAnalysis" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
             
             <!-- Traffic Analysis -->
-            <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                <div class="flex items-center space-x-3 mb-6">
-                    <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-road text-red-400 text-xl"></i>
+            <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 hover:border-red-400/30 transition-all duration-300 group">
+                <div class="flex items-center space-x-4 mb-8">
+                    <div class="w-14 h-14 bg-red-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-road text-red-400 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-white">Traffic Near Location</h3>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white">Traffic Analysis</h3>
+                        <p class="text-gray-400 text-sm">Road network and traffic patterns</p>
+                    </div>
                 </div>
                 
-                <div class="space-y-4">
+                <div class="space-y-6">
                     <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Score</span>
-                        <span id="trafficScore" class="text-2xl font-bold text-red-400">0</span>
+                        <span class="text-gray-300 font-medium">Traffic Score</span>
+                        <span id="trafficScore" class="text-3xl font-bold text-red-400">0</span>
                     </div>
-                    <div class="w-full bg-gray-700 rounded-full h-3">
-                        <div id="trafficProgress" class="progress-bar h-3 rounded-full bg-gradient-to-r from-red-500 to-red-400" style="width: 0%"></div>
+                    <div class="w-full bg-gray-700/50 rounded-full h-4 overflow-hidden">
+                        <div id="trafficProgress" class="progress-bar h-4 rounded-full bg-gradient-to-r from-red-500 to-red-400 shadow-lg" style="width: 0%"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Road Classification</div>
-                            <div id="roadType" class="text-white font-semibold">-</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Road Type</div>
+                            <div id="roadType" class="text-white font-bold text-lg">-</div>
                         </div>
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Traffic Density</div>
-                            <div id="trafficDensity" class="text-white font-semibold">-</div>
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Traffic Level</div>
+                            <div id="trafficDensity" class="text-white font-bold text-lg">-</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Competition Analysis -->
-            <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                <div class="flex items-center space-x-3 mb-6">
-                    <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-store text-orange-400 text-xl"></i>
+            <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 hover:border-orange-400/30 transition-all duration-300 group">
+                <div class="flex items-center space-x-4 mb-8">
+                    <div class="w-14 h-14 bg-orange-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-store text-orange-400 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-white">Competition Near Location</h3>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white">Competition Analysis</h3>
+                        <p class="text-gray-400 text-sm">Market competition and positioning</p>
+                    </div>
                 </div>
                 
-                <div class="space-y-4">
+                <div class="space-y-6">
                     <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Score</span>
-                        <span id="competitionScore" class="text-2xl font-bold text-orange-400">0</span>
+                        <span class="text-gray-300 font-medium">Competition Score</span>
+                        <span id="competitionScore" class="text-3xl font-bold text-orange-400">0</span>
                     </div>
-                    <div class="w-full bg-gray-700 rounded-full h-3">
-                        <div id="competitionProgress" class="progress-bar h-3 rounded-full bg-gradient-to-r from-orange-500 to-orange-400" style="width: 0%"></div>
+                    <div class="w-full bg-gray-700/50 rounded-full h-4 overflow-hidden">
+                        <div id="competitionProgress" class="progress-bar h-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-400 shadow-lg" style="width: 0%"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Competitor Count</div>
-                            <div id="competitorCount" class="text-white font-semibold">-</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Competitors</div>
+                            <div id="competitorCount" class="text-white font-bold text-lg">-</div>
                         </div>
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">PSO Market Share</div>
-                            <div id="marketShare" class="text-white font-semibold">-</div>
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Market Share</div>
+                            <div id="marketShare" class="text-white font-bold text-lg">-</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Land Analysis -->
-            <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                <div class="flex items-center space-x-3 mb-6">
-                    <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-map text-green-400 text-xl"></i>
+            <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 hover:border-green-400/30 transition-all duration-300 group">
+                <div class="flex items-center space-x-4 mb-8">
+                    <div class="w-14 h-14 bg-green-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-map text-green-400 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-white">Land</h3>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white">Land Classification</h3>
+                        <p class="text-gray-400 text-sm">Land use and accessibility factors</p>
+                    </div>
                 </div>
                 
-                <div class="space-y-4">
+                <div class="space-y-6">
                     <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Score</span>
-                        <span id="landScore" class="text-2xl font-bold text-green-400">0</span>
+                        <span class="text-gray-300 font-medium">Land Score</span>
+                        <span id="landScore" class="text-3xl font-bold text-green-400">0</span>
                     </div>
-                    <div class="w-full bg-gray-700 rounded-full h-3">
-                        <div id="landProgress" class="progress-bar h-3 rounded-full bg-gradient-to-r from-green-500 to-green-400" style="width: 0%"></div>
+                    <div class="w-full bg-gray-700/50 rounded-full h-4 overflow-hidden">
+                        <div id="landProgress" class="progress-bar h-4 rounded-full bg-gradient-to-r from-green-500 to-green-400 shadow-lg" style="width: 0%"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Land Use Type</div>
-                            <div id="landUseType" class="text-white font-semibold">-</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Land Use</div>
+                            <div id="landUseType" class="text-white font-bold text-lg">-</div>
                         </div>
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Accessibility</div>
-                            <div id="accessibility" class="text-white font-semibold">-</div>
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Accessibility</div>
+                            <div id="accessibility" class="text-white font-bold text-lg">-</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Socio Economic Profile -->
-            <div class="bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
-                <div class="flex items-center space-x-3 mb-6">
-                    <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-users text-purple-400 text-xl"></i>
+            <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 hover:border-purple-400/30 transition-all duration-300 group">
+                <div class="flex items-center space-x-4 mb-8">
+                    <div class="w-14 h-14 bg-purple-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-users text-purple-400 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-white">Socio Economic Profile & NFR</h3>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white">Socio Economic Profile</h3>
+                        <p class="text-gray-400 text-sm">Demographics and economic indicators</p>
+                    </div>
                 </div>
                 
-                <div class="space-y-4">
+                <div class="space-y-6">
                     <div class="flex items-center justify-between">
-                        <span class="text-gray-300">Score</span>
-                        <span id="socioScore" class="text-2xl font-bold text-purple-400">0</span>
+                        <span class="text-gray-300 font-medium">Socio Score</span>
+                        <span id="socioScore" class="text-3xl font-bold text-purple-400">0</span>
                     </div>
-                    <div class="w-full bg-gray-700 rounded-full h-3">
-                        <div id="socioProgress" class="progress-bar h-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-400" style="width: 0%"></div>
+                    <div class="w-full bg-gray-700/50 rounded-full h-4 overflow-hidden">
+                        <div id="socioProgress" class="progress-bar h-4 rounded-full bg-gradient-to-r from-purple-500 to-purple-400 shadow-lg" style="width: 0%"></div>
                     </div>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Population Density</div>
-                            <div id="populationDensity" class="text-white font-semibold">-</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Population</div>
+                            <div id="populationDensity" class="text-white font-bold text-lg">-</div>
                         </div>
-                        <div class="bg-gray-700/30 rounded-lg p-3">
-                            <div class="text-gray-400">Economic Level</div>
-                            <div id="economicLevel" class="text-white font-semibold">-</div>
+                        <div class="bg-gray-700/40 rounded-xl p-4 border border-gray-600/30">
+                            <div class="text-gray-400 text-sm font-medium mb-1">Economic Level</div>
+                            <div id="economicLevel" class="text-white font-bold text-lg">-</div>
                         </div>
                     </div>
                 </div>
@@ -329,42 +386,89 @@
         </div>
 
         <!-- Score Breakdown Chart -->
-        <div id="chartSection" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-8 mb-8">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div>
-                    <h3 class="text-2xl font-bold text-white mb-6">Score Breakdown</h3>
-                    <canvas id="scoreChart" width="400" height="300"></canvas>
+        <div id="chartSection" class="hidden">
+            <div class="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-8 mb-10 hover:border-blue-400/30 transition-all duration-300 group">
+                <div class="flex items-center space-x-4 mb-8">
+                    <div class="w-14 h-14 bg-blue-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i class="fas fa-chart-pie text-blue-400 text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-white">Score Breakdown Analysis</h3>
+                        <p class="text-gray-400 text-sm">Detailed parameter contribution and threshold categorization</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 class="text-2xl font-bold text-white mb-6">Category Thresholds</h3>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between p-4 bg-green-600/20 rounded-lg border border-green-600/30">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-4 h-4 bg-green-500 rounded-full"></div>
-                                <span class="font-semibold text-green-400">CF (Company Finance)</span>
-                            </div>
-                            <span class="text-green-400 font-bold">80-100 points</span>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Chart Section -->
+                    <div class="bg-gray-700/30 rounded-xl p-6 border border-gray-600/30">
+                        <h4 class="text-lg font-bold text-white mb-6 flex items-center">
+                            <i class="fas fa-analytics text-blue-400 mr-3"></i>
+                            Visual Breakdown
+                        </h4>
+                        <div class="relative h-80 flex items-center justify-center">
+                            <canvas id="scoreChart" width="400" height="300" class="max-w-full max-h-full"></canvas>
                         </div>
-                        <div class="flex items-center justify-between p-4 bg-blue-600/20 rounded-lg border border-blue-600/30">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-4 h-4 bg-blue-500 rounded-full"></div>
-                                <span class="font-semibold text-blue-400">DFA (Dealer Finance A)</span>
+                    </div>
+                    
+                    <!-- Category Thresholds -->
+                    <div class="bg-gray-700/30 rounded-xl p-6 border border-gray-600/30">
+                        <h4 class="text-lg font-bold text-white mb-6 flex items-center">
+                            <i class="fas fa-layer-group text-purple-400 mr-3"></i>
+                            Category Thresholds
+                        </h4>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-green-600/20 to-green-500/10 rounded-xl border border-green-600/30 hover:border-green-500/50 transition-colors">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-5 h-5 bg-green-500 rounded-full shadow-lg shadow-green-500/20"></div>
+                                    <div>
+                                        <div class="font-semibold text-green-400">CF (Company Finance)</div>
+                                        <div class="text-xs text-green-300/80">Premium category</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-green-400 font-bold text-lg">80-100</div>
+                                    <div class="text-xs text-green-300/80">points</div>
+                                </div>
                             </div>
-                            <span class="text-blue-400 font-bold">60-79 points</span>
-                        </div>
-                        <div class="flex items-center justify-between p-4 bg-yellow-600/20 rounded-lg border border-yellow-600/30">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                                <span class="font-semibold text-yellow-400">DFB (Dealer Finance B)</span>
+                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600/20 to-blue-500/10 rounded-xl border border-blue-600/30 hover:border-blue-500/50 transition-colors">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-5 h-5 bg-blue-500 rounded-full shadow-lg shadow-blue-500/20"></div>
+                                    <div>
+                                        <div class="font-semibold text-blue-400">DFA (Dealer Finance A)</div>
+                                        <div class="text-xs text-blue-300/80">High potential</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-blue-400 font-bold text-lg">60-79</div>
+                                    <div class="text-xs text-blue-300/80">points</div>
+                                </div>
                             </div>
-                            <span class="text-yellow-400 font-bold">49-60 points</span>
-                        </div>
-                        <div class="flex items-center justify-between p-4 bg-red-600/20 rounded-lg border border-red-600/30">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-4 h-4 bg-red-500 rounded-full"></div>
-                                <span class="font-semibold text-red-400">DFC (Dealer Finance C)</span>
+                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 rounded-xl border border-yellow-600/30 hover:border-yellow-500/50 transition-colors">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-5 h-5 bg-yellow-500 rounded-full shadow-lg shadow-yellow-500/20"></div>
+                                    <div>
+                                        <div class="font-semibold text-yellow-400">DFB (Dealer Finance B)</div>
+                                        <div class="text-xs text-yellow-300/80">Moderate potential</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-yellow-400 font-bold text-lg">49-60</div>
+                                    <div class="text-xs text-yellow-300/80">points</div>
+                                </div>
                             </div>
-                            <span class="text-red-400 font-bold">&lt; 49 points</span>
+                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-red-600/20 to-red-500/10 rounded-xl border border-red-600/30 hover:border-red-500/50 transition-colors">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-5 h-5 bg-red-500 rounded-full shadow-lg shadow-red-500/20"></div>
+                                    <div>
+                                        <div class="font-semibold text-red-400">DFC (Dealer Finance C)</div>
+                                        <div class="text-xs text-red-300/80">Limited potential</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-red-400 font-bold text-lg">&lt; 49</div>
+                                    <div class="text-xs text-red-300/80">points</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -389,8 +493,11 @@
        
     </div>
     <!-- JavaScript -->
+    <!-- Storage Manager -->
+    <script src="storage-manager.js"></script>
+    
     <script src="ssm.js"></script>
-
+    
     <footer class="bg-gray-800 border-t border-gray-700 mt-20">
         <div class="max-w-screen-xl mx-auto px-6 py-8">
             <div class="flex flex-col md:flex-row justify-between items-center">
@@ -424,4 +531,116 @@
             </div>
         </div>
     </footer>
+
+    <!-- Include SSM JavaScript -->
+    <script src="ssm.js"></script>
+
+    <!-- Auto-load coordinates from cookies on page load -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🍪 Auto-loading coordinates from cookies in HTML...');
+            
+            // Cookie reading function
+            function getCookie(name) {
+                const nameEQ = name + "=";
+                const ca = document.cookie.split(';');
+                for(let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+                }
+                return null;
+            }
+            
+            // Get coordinates from cookies
+            const cookieLat = getCookie('map_latitude');
+            const cookieLng = getCookie('map_longitude');
+            const cookieRadius = getCookie('map_radius');
+            
+            console.log('🍪 Found cookies in HTML:', {
+                map_latitude: cookieLat,
+                map_longitude: cookieLng,
+                map_radius: cookieRadius
+            });
+            
+            if (cookieLat && cookieLng) {
+                console.log('✅ Auto-filling coordinates from cookies in HTML');
+                
+                // Fill main SSM input fields
+                const latEl = document.getElementById('ssm-latitude');
+                const lngEl = document.getElementById('ssm-longitude');
+                const radiusEl = document.getElementById('ssm-radius');
+                
+                if (latEl) {
+                    latEl.value = cookieLat;
+                    console.log('✅ Filled ssm-latitude:', cookieLat);
+                }
+                if (lngEl) {
+                    lngEl.value = cookieLng;
+                    console.log('✅ Filled ssm-longitude:', cookieLng);
+                }
+                if (radiusEl && cookieRadius) {
+                    radiusEl.value = cookieRadius;
+                    console.log('✅ Filled ssm-radius:', cookieRadius);
+                }
+                
+                // Fill auto-generate input fields
+                const autoLatEl = document.getElementById('auto-latitude');
+                const autoLngEl = document.getElementById('auto-longitude');
+                const autoRadiusEl = document.getElementById('auto-radius');
+                
+                if (autoLatEl) {
+                    autoLatEl.value = cookieLat;
+                    console.log('✅ Filled auto-latitude:', cookieLat);
+                }
+                if (autoLngEl) {
+                    autoLngEl.value = cookieLng;
+                    console.log('✅ Filled auto-longitude:', cookieLng);
+                }
+                if (autoRadiusEl && cookieRadius) {
+                    autoRadiusEl.value = cookieRadius;
+                    console.log('✅ Filled auto-radius:', cookieRadius);
+                }
+                
+                // Show success toast if Toastify is available
+                setTimeout(() => {
+                    if (typeof Toastify !== 'undefined') {
+                        Toastify({
+                            text: "✅ Coordinates auto-loaded from cookies",
+                            duration: 3000,
+                            gravity: "top",
+                            position: "right",
+                            offset: {
+                                y: 80
+                            },
+                            className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+                            stopOnFocus: true
+                        }).showToast();
+                    }
+                }, 100);
+                
+            } else {
+                console.log('⚠️ No coordinates found in cookies in HTML');
+                
+                // Show info toast if no cookies found
+                setTimeout(() => {
+                    if (typeof Toastify !== 'undefined') {
+                        Toastify({
+                            text: "ℹ️ No saved coordinates found - please enter manually",
+                            duration: 2000,
+                            gravity: "top",
+                            position: "right",
+                            offset: {
+                                y: 80
+                            },
+                            className: "bg-gradient-to-r from-blue-800 to-blue-700 text-white rounded-lg shadow-lg border border-blue-600/20 font-medium text-sm",
+                            stopOnFocus: true
+                        }).showToast();
+                    }
+                }, 100);
+            }
+        });
+    </script>
+    </body>
+    </html>
 
