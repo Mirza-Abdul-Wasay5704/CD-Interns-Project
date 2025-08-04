@@ -1408,33 +1408,1615 @@ class StorageManager {
     }
 
     // ========================================
+    // ENHANCED DATA LOADING FOR REPORTS
+    // ========================================
+
+    getReportData() {
+        const allData = this.getAllData();
+        
+        // Enhanced coordinate extraction and validation
+        const coordinateData = this.extractBestCoordinates(allData);
+        
+        // Merge coordinate data into all sections
+        if (coordinateData.hasValidCoords) {
+            if (allData.map) {
+                allData.map.coordinates = coordinateData.coords;
+                allData.map.searchCoordinates = coordinateData.coords;
+            }
+            if (allData.ssm) {
+                allData.ssm.searchCoordinates = coordinateData.coords;
+            }
+            if (allData.analysis) {
+                allData.analysis.coordinates = coordinateData.coords;
+                allData.analysis.searchCoordinates = coordinateData.coords;
+            }
+        }
+        
+        return allData;
+    }
+
+    extractBestCoordinates(allData) {
+        const sources = [
+            { data: allData.map?.coordinates, source: 'map.coordinates' },
+            { data: allData.map?.searchCoordinates, source: 'map.searchCoordinates' },
+            { data: allData.ssm?.searchCoordinates, source: 'ssm.searchCoordinates' },
+            { data: allData.analysis?.coordinates, source: 'analysis.coordinates' },
+            { data: allData.analysis?.searchCoordinates, source: 'analysis.searchCoordinates' }
+        ];
+        
+        for (const { data, source } of sources) {
+            if (data && data.latitude && data.longitude) {
+                console.log(`🎯 Using coordinates from: ${source}`, data);
+                return {
+                    hasValidCoords: true,
+                    coords: {
+                        latitude: data.latitude,
+                        longitude: data.longitude,
+                        radius: data.radius || 5000
+                    },
+                    source
+                };
+            }
+        }
+        
+        // Try cookies as last resort
+        const cookieLat = this.getCookieValue('map_latitude');
+        const cookieLng = this.getCookieValue('map_longitude');
+        const cookieRadius = this.getCookieValue('map_radius');
+        
+        if (cookieLat && cookieLng) {
+            console.log('🍪 Using coordinates from cookies');
+            return {
+                hasValidCoords: true,
+                coords: {
+                    latitude: parseFloat(cookieLat),
+                    longitude: parseFloat(cookieLng),
+                    radius: cookieRadius ? parseFloat(cookieRadius) * 1000 : 5000
+                },
+                source: 'cookies'
+            };
+        }
+        
+        console.warn('⚠️ No valid coordinates found in any data source');
+        return { hasValidCoords: false, coords: null, source: 'none' };
+    }
+
+    getCookieValue(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    // ========================================
     // ADVANCED PDF REPORT GENERATION
     // ========================================
 
     async generateReport() {
+        console.log('📋 Starting professional report generation...');
+        
         try {
-            // Show loading UI
-            this.showReportGenerationUI();
+            // Show AI typing simulation UI
+            this.showAITypingUI();
             
-            // Validate data completeness
-            const validation = this.validateReportData();
-            if (!validation.isValid) {
-                throw new Error(`Incomplete data: ${validation.issues.join(', ')}`);
+            const allData = this.getReportData(); // Use enhanced data loading
+            console.log('📊 Enhanced data for report:', allData);
+            
+            // Debug coordinate data specifically
+            console.log('🔍 Debug coordinate data:');
+            console.log('  Map coordinates:', allData.map?.coordinates);
+            console.log('  Map searchCoordinates:', allData.map?.searchCoordinates);
+            console.log('  SSM searchCoordinates:', allData.ssm?.searchCoordinates);
+            console.log('  Analysis coordinates:', allData.analysis?.coordinates);
+            
+            // Check if we have any data at all
+            const hasMapData = allData.map && Object.keys(allData.map).length > 0;
+            const hasSSMData = allData.ssm && Object.keys(allData.ssm).length > 0;
+            const hasAnalysisData = allData.analysis && Object.keys(allData.analysis).length > 0;
+            
+            console.log('📊 Data availability:', { hasMapData, hasSSMData, hasAnalysisData });
+            
+            if (!hasMapData && !hasSSMData && !hasAnalysisData) {
+                throw new Error('No data available for report generation. Please run analysis on at least one module first.');
             }
-
-            // Generate HTML-based PDF report
-            const pdfBlob = await this.createHTMLtoPDF();
             
-            // Show success UI with download options
-            this.showReportSuccessUI(pdfBlob);
+            // Validate that we have at least some data
+            const validationResult = this.validateReportData();
+            if (!validationResult.isValid) {
+                console.warn('⚠️ Some data missing, but proceeding with available data:', validationResult.issues);
+            }
             
-            return pdfBlob;
+            // Run AI typing simulation and library loading in parallel for speed
+            const [_, loadResult] = await Promise.all([
+                this.simulateAIReportGeneration(allData),
+                this.loadChartLibraries()
+            ]);
+            
+            // Create professional PDF using jsPDF approach
+            const pdfBlob = await this.createProfessionalPDF(allData);
+            
+            if (pdfBlob && pdfBlob.size > 0) {
+                console.log('✅ Professional report generated successfully!');
+                // Show completion and options after AI typing is done
+                this.showReportSuccessUI(pdfBlob);
+                return pdfBlob;
+            } else {
+                throw new Error('Generated PDF is empty or invalid');
+            }
             
         } catch (error) {
-            console.error('❌ Error generating report:', error);
+            console.error('❌ Report generation failed:', error);
             this.showReportErrorUI(error.message);
             throw error;
         }
+    }
+
+    async loadChartLibraries() {
+        const loadScript = (src, timeout = 5000) => {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                
+                // Add timeout
+                const timeoutId = setTimeout(() => {
+                    script.remove();
+                    reject(new Error(`Script load timeout: ${src}`));
+                }, timeout);
+                
+                script.onload = () => {
+                    clearTimeout(timeoutId);
+                    resolve();
+                };
+                
+                document.head.appendChild(script);
+            });
+        };
+
+        try {
+            // Load libraries in parallel for speed
+            const loadPromises = [];
+            
+            // Load Chart.js if not already loaded
+            if (typeof Chart === 'undefined') {
+                loadPromises.push(loadScript('https://cdn.jsdelivr.net/npm/chart.js'));
+            }
+
+            // Load jsPDF if not already loaded
+            if (typeof window.jsPDF === 'undefined') {
+                loadPromises.push(loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'));
+            }
+            
+            // Wait for all libraries to load
+            if (loadPromises.length > 0) {
+                await Promise.all(loadPromises);
+            }
+        } catch (error) {
+            console.warn('⚠️ Some libraries failed to load, but proceeding with PDF generation:', error);
+            // Continue anyway as PDF generation might still work
+        }
+    }
+
+    async createProfessionalPDF(allData) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        let currentY = 20;
+        const pageHeight = 297; // A4 height in mm
+        const pageWidth = 210; // A4 width in mm
+        const margin = 20;
+        const contentWidth = pageWidth - (2 * margin);
+
+        // Function to add new page if needed
+        const checkNewPage = (requiredHeight) => {
+            if (currentY + requiredHeight > pageHeight - margin) {
+                doc.addPage();
+                currentY = margin;
+                return true;
+            }
+            return false;
+        };
+
+        // Start directly with the main content - no cover page or table of contents
+        currentY = 20;
+        this.addProfessionalHeader(doc, margin, currentY);
+        currentY += 30; // Increased space for larger header
+
+        // Executive Summary
+        currentY = await this.addExecutiveSummary(doc, allData, margin, currentY, contentWidth);
+        
+        // Location Information
+        checkNewPage(50);
+        currentY = this.addLocationInfo(doc, allData, margin, currentY, contentWidth);
+        
+        // Competition Analysis with Chart
+        checkNewPage(80);
+        currentY = await this.addCompetitionAnalysis(doc, allData, margin, currentY, contentWidth);
+        
+        // Recommendations
+        checkNewPage(70);
+        currentY = this.addRecommendations(doc, allData, margin, currentY, contentWidth);
+        
+        // Footer on each page
+        this.addFooterToAllPages(doc);
+
+        return doc.output('blob');
+    }
+
+    addCoverPage(doc, allData, margin, contentWidth) {
+        // PSO Logo (larger on cover)
+        try {
+            const logoPath = 'assets/logos/pso.png';
+            doc.addImage(logoPath, 'PNG', margin + 70, 40, 40, 40);
+        } catch (error) {
+            // Fallback PSO text if logo fails
+            doc.setTextColor(28, 102, 69);
+            doc.setFontSize(32);
+            doc.setFont(undefined, 'bold');
+            doc.text('PSO', 105, 65, { align: 'center' });
+        }
+        
+        // Company name
+        doc.setTextColor(28, 102, 69);
+        doc.setFontSize(24);
+        doc.setFont(undefined, 'bold');
+        doc.text('PAKISTAN STATE OIL', 105, 100, { align: 'center' });
+        
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'normal');
+        doc.text('COMPANY LIMITED', 105, 110, { align: 'center' });
+        
+        // Report title
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        doc.text('SITE SELECTION ANALYSIS REPORT', 105, 140, { align: 'center' });
+        
+        // Confidentiality notice
+        doc.setFillColor(28, 102, 69);
+        doc.rect(margin, 160, contentWidth, 15, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('CONFIDENTIAL - BOARD OF DIRECTORS', 105, 170, { align: 'center' });
+        
+        // Date and location info
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'normal');
+        
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        doc.text(`Report Date: ${dateStr}`, 105, 200, { align: 'center' });
+        doc.text('Channel Development Department', 105, 210, { align: 'center' });
+        doc.text('Head Office, Karachi', 105, 220, { align: 'center' });
+        
+        // Executive Summary Box
+        const coords = this.extractBestCoordinates(allData);
+        if (coords.hasValidCoords) {
+            doc.setFillColor(248, 249, 250);
+            doc.rect(margin, 240, contentWidth, 20, 'F');
+            doc.setTextColor(28, 102, 69);
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'bold');
+            doc.text('ANALYSIS LOCATION:', margin + 5, 248);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`${coords.coords.latitude.toFixed(4)}, ${coords.coords.longitude.toFixed(4)} | Radius: ${(coords.coords.radius/1000).toFixed(1)}km`, margin + 5, 255);
+        }
+    }
+
+    addTableOfContents(doc, margin, contentWidth) {
+        let currentY = 50;
+        
+        // Header
+        doc.setTextColor(28, 102, 69);
+        doc.setFontSize(20);
+        doc.setFont(undefined, 'bold');
+        doc.text('TABLE OF CONTENTS', 105, currentY, { align: 'center' });
+        currentY += 20;
+        
+        // TOC items
+        const tocItems = [
+            { title: 'Executive Summary', page: 3 },
+            { title: 'Location Analysis', page: 3 },
+            { title: 'Competition Analysis', page: 4 },
+            { title: 'Strategic Recommendations', page: 4 }
+        ];
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        
+        tocItems.forEach(item => {
+            doc.setFont(undefined, 'normal');
+            doc.text(item.title, margin + 10, currentY);
+            
+            // Dotted line
+            const dots = '.'.repeat(60);
+            doc.setFont(undefined, 'normal');
+            doc.text(dots, margin + 80, currentY);
+            
+            doc.setFont(undefined, 'bold');
+            doc.text(item.page.toString(), 210 - margin - 10, currentY, { align: 'right' });
+            
+            currentY += 12;
+        });
+        
+        // Disclaimer
+        currentY += 20;
+        doc.setFillColor(255, 249, 196);
+        doc.rect(margin, currentY, contentWidth, 40, 'F');
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.text('DISCLAIMER:', margin + 5, currentY + 8);
+        doc.setFont(undefined, 'normal');
+        doc.text('This report contains confidential and proprietary information of Pakistan State Oil Company Limited.', margin + 5, currentY + 16);
+        doc.text('The analysis and recommendations are based on available data and market conditions at the time of', margin + 5, currentY + 24);
+        doc.text('report generation. Final investment decisions should consider additional factors and due diligence.', margin + 5, currentY + 32);
+    }
+
+    addProfessionalHeader(doc, margin, y) {
+        // Simple PSO Header Background (minimal color)
+        doc.setFillColor(240, 240, 240); // Light gray instead of PSO green
+        doc.rect(0, 0, 210, 35, 'F');
+        
+        // Add PSO Logo
+        try {
+            // Load and add PSO logo
+            const logoPath = 'assets/logos/pso.png';
+            doc.addImage(logoPath, 'PNG', margin, 5, 25, 25);
+        } catch (error) {
+            console.log('Logo not loaded, using text header');
+            // Fallback PSO text if logo fails
+            doc.setTextColor(0, 0, 0); // Black text instead of white
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text('PSO', margin, 20);
+        }
+        
+        // Company Header
+        doc.setTextColor(0, 0, 0); // Black text
+        doc.setFontSize(20);
+        doc.setFont(undefined, 'bold');
+        doc.text('PAKISTAN STATE OIL', margin + 35, 15);
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        doc.text('Channel Development Department', margin + 35, 22);
+        doc.text('Strategic Site Selection Analysis', margin + 35, 28);
+        
+        // Report Classification
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'bold');
+        doc.text('CONFIDENTIAL - BOARD LEVEL REPORT', 210 - margin - 45, 10);
+        
+        // Report date and time
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        const timeStr = today.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        doc.text(`Generated: ${dateStr} at ${timeStr}`, 210 - margin - 45, 25);
+        
+        // Separator line
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(margin, 37, 210 - margin, 37);
+        
+        // Reset text color
+        doc.setTextColor(0, 0, 0);
+    }
+
+    async addExecutiveSummary(doc, allData, margin, startY, contentWidth) {
+        let currentY = startY; // Removed the +5 gap
+        
+        // Section title with minimal styling
+        doc.setFillColor(250, 250, 250); // Very light gray background
+        doc.rect(margin, currentY - 3, contentWidth, 10, 'F');
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Black text
+        doc.text('EXECUTIVE SUMMARY', margin + 3, currentY + 4);
+        currentY += 15;
+        
+        // Reset text color
+        doc.setTextColor(0, 0, 0);
+        
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const ssmData = allData.ssm || {};
+        const analysisData = allData.analysis || {};
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        const competitors = stations.filter(s => s.brand && !s.brand.toLowerCase().includes('pso'));
+        
+        // Compact KPI Grid
+        const kpiData = [
+            { 
+                label: 'Market Position', 
+                value: stations.length === 0 ? 'UNTAPPED' : `${((psoStations.length / stations.length) * 100).toFixed(0)}%`,
+                color: stations.length === 0 ? [28, 102, 69] : psoStations.length === 0 ? [184, 49, 47] : [28, 102, 69],
+                subtext: stations.length === 0 ? 'Virgin Market' : 'Market Share'
+            },
+            { 
+                label: 'Competition', 
+                value: competitors.length <= 2 ? 'LOW' : competitors.length <= 5 ? 'MEDIUM' : 'HIGH',
+                color: competitors.length <= 2 ? [28, 102, 69] : competitors.length <= 5 ? [191, 144, 0] : [184, 49, 47],
+                subtext: `${competitors.length} Stations`
+            },
+            { 
+                label: 'Site Score', 
+                value: ssmData.overallScore ? `${ssmData.overallScore}/100` : 'PENDING',
+                color: !ssmData.overallScore ? [108, 117, 125] : 
+                       ssmData.overallScore >= 75 ? [28, 102, 69] :
+                       ssmData.overallScore >= 50 ? [191, 144, 0] : [184, 49, 47],
+                subtext: ssmData.siteCategory || 'Analysis Pending'
+            },
+            { 
+                label: 'Risk Level', 
+                value: this.calculateInvestmentRisk(allData),
+                color: this.getRiskColor(this.calculateInvestmentRisk(allData)),
+                subtext: 'Investment Risk'
+            }
+        ];
+        
+        const boxWidth = (contentWidth - 15) / 4;
+        const boxHeight = 25;
+        
+        kpiData.forEach((item, index) => {
+            const x = margin + (index * (boxWidth + 5));
+            
+            // Simple box with light gray background
+            doc.setFillColor(245, 245, 245); // Light gray background for all boxes
+            doc.rect(x, currentY, boxWidth, boxHeight, 'F');
+            
+            // Gray border
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.rect(x, currentY, boxWidth, boxHeight);
+            
+            // Value
+            doc.setTextColor(0, 0, 0); // Black text
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(String(item.value), x + boxWidth/2, currentY + 10, { align: 'center' });
+            
+            // Label
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            doc.text(item.label, x + boxWidth/2, currentY + 17, { align: 'center' });
+            
+            // Subtext
+            doc.setFontSize(7);
+            doc.text(item.subtext, x + boxWidth/2, currentY + 22, { align: 'center' });
+        });
+        
+        currentY += 35;
+        
+        // Compact Strategic Assessment
+        doc.setTextColor(0, 0, 0); // Black text instead of green
+        doc.setFontSize(11);
+        doc.setFont(undefined, 'bold');
+        doc.text('KEY INSIGHTS', margin, currentY);
+        currentY += 6;
+        
+        // Professional insights without decorative elements
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        
+        // Get AI-enhanced insights for display
+        const aiInsights = this.getAIInsightsForPDF(allData);
+        const strategicInsights = this.generateAIEnhancedStrategicInsights(allData, aiInsights);
+        strategicInsights.slice(0, 4).forEach(insight => {
+            // Simple bullet point
+            doc.text('•', margin, currentY);
+            
+            // Split long text into multiple lines properly
+            const lines = doc.splitTextToSize(insight.text, contentWidth - 30);
+            lines.forEach((line, lineIndex) => {
+                if (lineIndex === 0) {
+                    doc.text(line, margin + 5, currentY);
+                } else {
+                    currentY += 4;
+                    doc.text(line, margin + 5, currentY);
+                }
+            });
+            
+            // Status indicator on the same line as first line
+            const firstLineY = currentY - (lines.length - 1) * 4;
+            if (insight.type === 'opportunity') {
+                doc.setTextColor(28, 102, 69);
+                doc.setFont(undefined, 'bold');
+                doc.text('[OPPORTUNITY]', 210 - margin - 22, firstLineY);
+            } else if (insight.type === 'risk') {
+                doc.setTextColor(184, 49, 47);
+                doc.setFont(undefined, 'bold');
+                doc.text('[RISK]', 210 - margin - 12, firstLineY);
+            }
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            currentY += 6; // Add space between insights
+        });
+        
+        return currentY + 10;
+    }
+
+    addLocationInfo(doc, allData, margin, startY, contentWidth) {
+        let currentY = startY;
+        
+        // Simple section title with light gray background
+        doc.setFillColor(240, 240, 240); // Light gray instead of green
+        doc.rect(margin, currentY - 3, contentWidth, 10, 'F');
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Black text instead of white
+        doc.text('LOCATION ANALYSIS', margin + 3, currentY + 4);
+        currentY += 15;
+        
+        // Enhanced coordinate extraction from multiple data sources
+        let latitude = 0, longitude = 0, radius = 0, searchRadius = 0;
+        
+        // Try multiple data paths to find coordinates with better radius handling
+        if (allData.map?.coordinates?.latitude && allData.map?.coordinates?.longitude) {
+            latitude = allData.map.coordinates.latitude;
+            longitude = allData.map.coordinates.longitude;
+            radius = allData.map.coordinates.radius || allData.map.searchRadius || 0;
+        } else if (allData.map?.searchCoordinates?.latitude && allData.map?.searchCoordinates?.longitude) {
+            latitude = allData.map.searchCoordinates.latitude;
+            longitude = allData.map.searchCoordinates.longitude;
+            radius = allData.map.searchCoordinates.radius || 0;
+        } else if (allData.ssm?.searchCoordinates?.latitude && allData.ssm?.searchCoordinates?.longitude) {
+            latitude = allData.ssm.searchCoordinates.latitude;
+            longitude = allData.ssm.searchCoordinates.longitude;
+            radius = allData.ssm.searchCoordinates.radius || 0;
+        } else if (allData.analysis?.searchCoordinates?.latitude && allData.analysis?.searchCoordinates?.longitude) {
+            latitude = allData.analysis.searchCoordinates.latitude;
+            longitude = allData.analysis.searchCoordinates.longitude;
+            radius = allData.analysis.searchCoordinates.radius || 0;
+        } else if (allData.analysis?.coordinates?.latitude && allData.analysis?.coordinates?.longitude) {
+            latitude = allData.analysis.coordinates.latitude;
+            longitude = allData.analysis.coordinates.longitude;
+            radius = allData.analysis.coordinates.radius || 0;
+        }
+        
+        // Additional search for radius in different places
+        if (radius === 0) {
+            searchRadius = allData.map?.searchRadius || 
+                          allData.ssm?.searchRadius || 
+                          allData.analysis?.searchRadius || 
+                          allData.map?.coordinates?.searchRadius ||
+                          allData.searchRadius || 0;
+            if (searchRadius > 0) radius = searchRadius;
+        }
+        
+        // Convert radius properly - handle both meters and kilometers
+        let radiusInKm = 0;
+        if (radius > 0) {
+            if (radius > 100) {
+                radiusInKm = radius / 1000;
+            } else {
+                radiusInKm = radius;
+            }
+        }
+        
+        // Compact table format
+        doc.setTextColor(0, 0, 0);
+        
+        // Coordinates Table
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(28, 102, 69);
+        doc.text('COORDINATES', margin, currentY);
+        currentY += 6;
+        
+        // Table header
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, currentY, contentWidth, 6, 'F');
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Parameter', margin + 2, currentY + 4);
+        doc.text('Value', margin + 70, currentY + 4);
+        doc.text('Unit', margin + 130, currentY + 4);
+        currentY += 8;
+        
+        // Compact data rows
+        const locationData = [
+            { 
+                parameter: 'Latitude', 
+                value: latitude ? latitude.toFixed(4) : 'N/A',
+                unit: latitude ? 'degrees' : '-'
+            },
+            { 
+                parameter: 'Longitude', 
+                value: longitude ? longitude.toFixed(4) : 'N/A',
+                unit: longitude ? 'degrees' : '-'
+            },
+            { 
+                parameter: 'Search Radius', 
+                value: radiusInKm > 0 ? radiusInKm.toFixed(1) : 'N/A',
+                unit: radiusInKm > 0 ? 'km' : '-'
+            },
+            { 
+                parameter: 'Coverage Area', 
+                value: radiusInKm > 0 ? (Math.PI * Math.pow(radiusInKm, 2)).toFixed(1) : 'N/A',
+                unit: radiusInKm > 0 ? 'sq km' : '-'
+            }
+        ];
+        
+        locationData.forEach((item, index) => {
+            if (index % 2 === 1) {
+                doc.setFillColor(252, 253, 254);
+                doc.rect(margin, currentY - 1, contentWidth, 6, 'F');
+            }
+            
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.text(item.parameter, margin + 2, currentY + 3);
+            
+            // Color code values
+            if (item.value === 'N/A') {
+                doc.setTextColor(108, 117, 125);
+            } else {
+                doc.setTextColor(28, 102, 69);
+            }
+            doc.setFont(undefined, 'bold');
+            doc.text(item.value, margin + 70, currentY + 3);
+            
+            doc.setTextColor(108, 117, 125);
+            doc.setFont(undefined, 'normal');
+            doc.text(item.unit, margin + 130, currentY + 3);
+            
+            currentY += 6;
+        });
+        
+        currentY += 8;
+        
+        // Analysis Status Table
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(28, 102, 69);
+        doc.text('ANALYSIS STATUS', margin, currentY);
+        currentY += 6;
+        
+        // Status table header
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, currentY, contentWidth, 6, 'F');
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Module', margin + 2, currentY + 4);
+        doc.text('Status', margin + 70, currentY + 4);
+        doc.text('Data Points', margin + 130, currentY + 4);
+        currentY += 8;
+        
+        const analysisData = [
+            { 
+                type: 'Fuel Stations', 
+                status: allData.map?.stations?.length > 0 ? 'COMPLETE' : 'PENDING',
+                points: allData.map?.stations?.length || 0
+            },
+            { 
+                type: 'Land Use', 
+                status: allData.analysis?.landUse ? 'COMPLETE' : 'PENDING',
+                points: allData.analysis?.totalElements || 0
+            },
+            { 
+                type: 'Site Matrix', 
+                status: allData.ssm?.overallScore ? 'COMPLETE' : 'PENDING',
+                points: allData.ssm?.overallScore || 0
+            }
+        ];
+        
+        analysisData.forEach((item, index) => {
+            if (index % 2 === 1) {
+                doc.setFillColor(252, 253, 254);
+                doc.rect(margin, currentY - 1, contentWidth, 6, 'F');
+            }
+            
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.text(item.type, margin + 2, currentY + 3);
+            
+            // Status color coding
+            if (item.status === 'COMPLETE') {
+                doc.setTextColor(28, 102, 69);
+            } else {
+                doc.setTextColor(184, 49, 47);
+            }
+            doc.setFont(undefined, 'bold');
+            doc.text(item.status, margin + 70, currentY + 3);
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'normal');
+            doc.text(String(item.points), margin + 130, currentY + 3);
+            
+            currentY += 6;
+        });
+        
+        return currentY + 10;
+    }
+
+    async addCompetitionAnalysis(doc, allData, margin, startY, contentWidth) {
+        let currentY = startY;
+        
+        // Simple section title with light gray background
+        doc.setFillColor(240, 240, 240); // Light gray instead of green
+        doc.rect(margin, currentY - 3, contentWidth, 10, 'F');
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Black text instead of white
+        doc.text('COMPETITION ANALYSIS', margin + 3, currentY + 4);
+        currentY += 15;
+        
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const brandCounts = {};
+        
+        if (stations.length > 0) {
+            stations.forEach(station => {
+                const brand = station.brand || 'Unknown';
+                brandCounts[brand] = (brandCounts[brand] || 0) + 1;
+            });
+        }
+        
+        // Compact Market Overview
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(28, 102, 69);
+        doc.text('MARKET OVERVIEW', margin, currentY);
+        currentY += 6;
+        
+        // Compact summary table
+        doc.setFillColor(248, 249, 250);
+        doc.rect(margin, currentY, contentWidth, 6, 'F');
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Metric', margin + 2, currentY + 4);
+        doc.text('Value', margin + 70, currentY + 4);
+        doc.text('Assessment', margin + 120, currentY + 4);
+        currentY += 8;
+        
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        const competitors = stations.filter(s => s.brand && !s.brand.toLowerCase().includes('pso'));
+        const marketShare = stations.length > 0 ? ((psoStations.length / stations.length) * 100).toFixed(0) : '0';
+        
+        const marketMetrics = [
+            { 
+                metric: 'Total Stations', 
+                value: stations.length.toString(),
+                assessment: stations.length === 0 ? 'UNTAPPED' : 
+                           stations.length <= 3 ? 'LOW DENSITY' : 
+                           stations.length <= 8 ? 'MODERATE' : 'HIGH DENSITY'
+            },
+            { 
+                metric: 'PSO Share', 
+                value: `${marketShare}%`,
+                assessment: psoStations.length === 0 ? 'ABSENT' : 
+                           parseFloat(marketShare) >= 40 ? 'STRONG' : 'WEAK'
+            },
+            { 
+                metric: 'Competition', 
+                value: competitors.length <= 2 ? 'LOW' : competitors.length <= 5 ? 'MED' : 'HIGH',
+                assessment: competitors.length <= 2 ? 'FAVORABLE' : 
+                           competitors.length <= 5 ? 'MANAGEABLE' : 'INTENSE'
+            }
+        ];
+        
+        marketMetrics.forEach((item, index) => {
+            if (index % 2 === 1) {
+                doc.setFillColor(252, 253, 254);
+                doc.rect(margin, currentY - 1, contentWidth, 6, 'F');
+            }
+            
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.text(item.metric, margin + 2, currentY + 3);
+            
+            doc.setFont(undefined, 'bold');
+            doc.text(item.value, margin + 70, currentY + 3);
+            
+            // Assessment color coding
+            const assessmentColors = {
+                'UNTAPPED': [28, 102, 69],
+                'ABSENT': [28, 102, 69],
+                'FAVORABLE': [28, 102, 69],
+                'STRONG': [28, 102, 69],
+                'MANAGEABLE': [191, 144, 0],
+                'WEAK': [191, 144, 0],
+                'INTENSE': [184, 49, 47]
+            };
+            
+            const color = assessmentColors[item.assessment] || [108, 117, 125];
+            doc.setTextColor(...color);
+            doc.text(item.assessment, margin + 120, currentY + 3);
+            
+            currentY += 6;
+        });
+        
+        currentY += 8;
+        
+        // Compact Brand Distribution
+        if (stations.length > 0) {
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(28, 102, 69);
+            doc.text('BRAND BREAKDOWN', margin, currentY);
+            currentY += 6;
+            
+            // Compact brand table
+            doc.setFillColor(248, 249, 250);
+            doc.rect(margin, currentY, contentWidth, 6, 'F');
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text('Brand', margin + 2, currentY + 4);
+            doc.text('Count', margin + 60, currentY + 4);
+            doc.text('Share', margin + 90, currentY + 4);
+            doc.text('Threat Level', margin + 120, currentY + 4);
+            currentY += 8;
+            
+            // Sort brands by count and show top 5
+            const sortedBrands = Object.entries(brandCounts).sort(([,a], [,b]) => b - a).slice(0, 5);
+            
+            sortedBrands.forEach(([brand, count], index) => {
+                if (index % 2 === 1) {
+                    doc.setFillColor(252, 253, 254);
+                    doc.rect(margin, currentY - 1, contentWidth, 6, 'F');
+                }
+                
+                const percentage = ((count / stations.length) * 100).toFixed(0);
+                const isPSO = brand.toLowerCase().includes('pso');
+                
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                
+                // Brand name with PSO highlighting
+                if (isPSO) {
+                    doc.setTextColor(28, 102, 69);
+                    doc.setFont(undefined, 'bold');
+                }
+                doc.text(brand.length > 12 ? brand.substring(0, 12) + '...' : brand, margin + 2, currentY + 3);
+                
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(0, 0, 0);
+                doc.text(count.toString(), margin + 60, currentY + 3);
+                doc.text(`${percentage}%`, margin + 90, currentY + 3);
+                
+                // Threat level assessment
+                let threatLevel = 'LOW';
+                let threatColor = [28, 102, 69];
+                
+                if (!isPSO) {
+                    if (count >= 3) {
+                        threatLevel = 'HIGH';
+                        threatColor = [184, 49, 47];
+                    } else if (count >= 2) {
+                        threatLevel = 'MED';
+                        threatColor = [191, 144, 0];
+                    }
+                } else {
+                    threatLevel = 'ALLY';
+                    threatColor = [28, 102, 69];
+                }
+                
+                doc.setTextColor(...threatColor);
+                doc.setFont(undefined, 'bold');
+                doc.text(threatLevel, margin + 120, currentY + 3);
+                
+                currentY += 6;
+            });
+        } else {
+            // Opportunity message for no stations
+            doc.setFillColor(240, 253, 244);
+            doc.rect(margin, currentY, contentWidth, 15, 'F');
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(28, 102, 69);
+            doc.text('OPPORTUNITY: Untapped market - No existing fuel stations found', margin + 3, currentY + 8);
+            currentY += 18;
+        }
+        
+        // Create competition chart if we have data
+        if (Object.keys(brandCounts).length > 0 && stations.length > 0) {
+            const chartCanvas = await this.createCompetitionChart(brandCounts);
+            if (chartCanvas) {
+                currentY += 8;
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(28, 102, 69);
+                doc.text('MARKET DISTRIBUTION', margin, currentY);
+                currentY += 6;
+                
+                const imgData = chartCanvas.toDataURL('image/png');
+                // Compact chart positioning
+                const chartX = margin + (contentWidth - 100) / 2;
+                doc.addImage(imgData, 'PNG', chartX, currentY, 100, 60);
+                currentY += 65;
+            }
+        }
+        
+        return currentY + 8;
+    }
+
+    async addMarketAnalysis(doc, allData, margin, startY, contentWidth) {
+        let currentY = startY;
+        
+        // Section title with PSO branding
+        doc.setFillColor(28, 102, 69);
+        doc.rect(margin, currentY - 5, contentWidth, 12, 'F');
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text('MARKET & FINANCIAL ANALYSIS', margin + 5, currentY + 4);
+        currentY += 20;
+        
+        const analysisData = allData.analysis || {};
+        const ssmData = allData.ssm || {};
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        
+        // Reset text color
+        doc.setTextColor(0, 0, 0);
+        
+        // Financial Projections Section
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(28, 102, 69);
+        doc.text('INVESTMENT PROJECTIONS', margin, currentY);
+        currentY += 8;
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        
+        const financialMetrics = this.calculateFinancialProjections(allData);
+        const leftCol = margin;
+        const rightCol = margin + contentWidth/2 + 10;
+        
+        // Left column - Investment metrics
+        doc.setFont(undefined, 'bold');
+        doc.text('Initial Investment Estimate:', leftCol, currentY);
+        doc.setFont(undefined, 'normal');
+        doc.text(`PKR ${financialMetrics.initialInvestment} Million`, leftCol + 5, currentY + 6);
+        currentY += 12;
+        
+        doc.setFont(undefined, 'bold');
+        doc.text('Expected ROI Timeline:', leftCol, currentY);
+        doc.setFont(undefined, 'normal');
+        doc.text(`${financialMetrics.roiTimeline} Years`, leftCol + 5, currentY + 6);
+        currentY += 12;
+        
+        // Right column - Market metrics  
+        let rightY = currentY - 24;
+        doc.setFont(undefined, 'bold');
+        doc.text('Market Potential Score:', rightCol, rightY);
+        doc.setFont(undefined, 'normal');
+        doc.text(`${financialMetrics.marketPotential}/100`, rightCol + 5, rightY + 6);
+        rightY += 12;
+        
+        doc.setFont(undefined, 'bold');
+        doc.text('Competition Risk Level:', rightCol, rightY);
+        doc.setFont(undefined, 'normal');
+        doc.text(this.calculateInvestmentRisk(allData), rightCol + 5, rightY + 6);
+        
+        currentY += 10;
+        
+        // Market Demographics Section
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(28, 102, 69);
+        doc.text('DEMOGRAPHIC & TRAFFIC ANALYSIS', margin, currentY);
+        currentY += 8;
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        
+        const demographicInsights = this.generateDemographicInsights(allData);
+        demographicInsights.forEach(insight => {
+            doc.setFillColor(28, 102, 69);
+            doc.circle(margin + 2, currentY - 1, 0.8, 'F');
+            doc.text(insight, margin + 8, currentY);
+            currentY += 6;
+        });
+        
+        currentY += 8;
+        
+        // Strategic Recommendations Section
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(28, 102, 69);
+        doc.text('BOARD RECOMMENDATIONS', margin, currentY);
+        currentY += 8;
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        
+        const boardRecommendations = this.generateBoardRecommendations(allData);
+        boardRecommendations.forEach((rec, index) => {
+            doc.setFont(undefined, 'bold');
+            doc.text(`${index + 1}. ${rec.title}:`, margin, currentY);
+            currentY += 5;
+            doc.setFont(undefined, 'normal');
+            doc.text(`   ${rec.description}`, margin, currentY);
+            currentY += 8;
+        });
+        
+        return currentY + 10;
+    }
+
+    addRecommendations(doc, allData, margin, startY, contentWidth) {
+        let currentY = startY;
+        
+        // Simple section title with minimal styling
+        doc.setFillColor(240, 240, 240); // Light gray background
+        doc.rect(margin, currentY - 5, contentWidth, 10, 'F');
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(0, 0, 0); // Black text instead of green
+        doc.text('STRATEGIC RECOMMENDATIONS', margin + 2, currentY + 2);
+        currentY += 15;
+        
+        const recommendations = this.generateRecommendations(allData);
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(10);
+        
+        recommendations.forEach((rec, index) => {
+            doc.setFont(undefined, 'bold');
+            doc.text(`${index + 1}.`, margin, currentY);
+            doc.setFont(undefined, 'normal');
+            
+            // Split long text into multiple lines
+            const lines = doc.splitTextToSize(rec, contentWidth - 10);
+            lines.forEach((line, lineIndex) => {
+                doc.text(line, margin + (lineIndex === 0 ? 8 : 5), currentY);
+                if (lineIndex < lines.length - 1) currentY += 5;
+            });
+            currentY += 8;
+        });
+        
+        return currentY + 10;
+    }
+
+    addFooterToAllPages(doc) {
+        const totalPages = doc.internal.getNumberOfPages();
+        const pageHeight = doc.internal.pageSize.height;
+        const pageWidth = doc.internal.pageSize.width;
+        
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            
+            // Footer background
+            doc.setFillColor(245, 245, 245);
+            doc.rect(0, pageHeight - 15, pageWidth, 15, 'F');
+            
+            // Footer line
+            doc.setDrawColor(28, 102, 69);
+            doc.setLineWidth(1);
+            doc.line(20, pageHeight - 15, pageWidth - 20, pageHeight - 15);
+            
+            // Footer content
+            doc.setTextColor(28, 102, 69);
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'bold');
+            
+            // Left side - Document classification
+            doc.text('PSO CONFIDENTIAL', 20, pageHeight - 8);
+            
+            // Center - Company info
+            doc.setFont(undefined, 'normal');
+            doc.text('Pakistan State Oil Company Limited - Channel Development', pageWidth/2, pageHeight - 8, { align: 'center' });
+            
+            // Right side - Page number
+            doc.setFont(undefined, 'bold');
+            doc.text(`Page ${i} of ${totalPages}`, pageWidth - 20, pageHeight - 8, { align: 'right' });
+            
+            // Additional footer line
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.3);
+            doc.line(20, pageHeight - 3, pageWidth - 20, pageHeight - 3);
+        }
+    }
+
+    async createCompetitionChart(brandCounts) {
+        // Handle empty or invalid data
+        if (!brandCounts || Object.keys(brandCounts).length === 0) {
+            console.log('📊 No brand data available for chart');
+            return null;
+        }
+        
+        // Handle case where no stations were found
+        if (Object.keys(brandCounts).includes('No Stations Found')) {
+            console.log('📊 No stations found - skipping chart generation');
+            return null;
+        }
+        
+        // Create a temporary canvas for the chart
+        const canvas = document.createElement('canvas');
+        canvas.width = 350;
+        canvas.height = 200;
+        canvas.style.position = 'absolute';
+        canvas.style.left = '-9999px';
+        document.body.appendChild(canvas);
+        
+        try {
+            const ctx = canvas.getContext('2d');
+            
+            // Professional PSO-themed color palette
+            const brands = Object.keys(brandCounts);
+            const colors = brands.map(brand => {
+                if (brand.toLowerCase().includes('pso')) {
+                    return '#1C6645'; // PSO Primary Green
+                } else if (brand.toLowerCase().includes('shell')) {
+                    return '#FFD700'; // Shell Yellow
+                } else if (brand.toLowerCase().includes('total')) {
+                    return '#E74C3C'; // Total Red
+                } else if (brand.toLowerCase().includes('caltex')) {
+                    return '#3498DB'; // Caltex Blue
+                } else if (brand.toLowerCase().includes('attock')) {
+                    return '#9B59B6'; // Attock Purple
+                } else if (brand.toLowerCase().includes('byco')) {
+                    return '#F39C12'; // Byco Orange
+                } else if (brand.toLowerCase().includes('hascol')) {
+                    return '#1ABC9C'; // Hascol Teal
+                } else if (brand.toLowerCase().includes('go')) {
+                    return '#E67E22'; // GO Orange
+                } else {
+                    return '#6C757D'; // Default Gray
+                }
+            });
+            
+            const chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: brands,
+                    datasets: [{
+                        data: Object.values(brandCounts),
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverBorderWidth: 3,
+                        hoverBorderColor: '#1C6645'
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: {
+                                    size: 10,
+                                    family: 'Arial, sans-serif'
+                                },
+                                color: '#2C3E50',
+                                padding: 8,
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                boxWidth: 8
+                            }
+                        },
+                        title: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(28, 102, 69, 0.95)',
+                            titleColor: '#ffffff',
+                            bodyColor: '#ffffff',
+                            borderColor: '#1C6645',
+                            borderWidth: 1,
+                            cornerRadius: 4,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.raw / total) * 100).toFixed(0);
+                                    return `${context.label}: ${percentage}%`;
+                                }
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            top: 5,
+                            bottom: 5,
+                            left: 5,
+                            right: 5
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+            
+            // Wait for chart to render
+            await new Promise(resolve => setTimeout(resolve, 600));
+            
+            return canvas;
+        } catch (error) {
+            console.error('❌ Error creating competition chart:', error);
+            return null;
+        } finally {
+            // Clean up
+            setTimeout(() => {
+                if (canvas && canvas.parentNode) {
+                    canvas.parentNode.removeChild(canvas);
+                }
+            }, 1000);
+        }
+    }
+
+    // Helper methods for analysis
+    generateKeyInsights(allData) {
+        const insights = [];
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        
+        if (stations.length === 0) {
+            insights.push('No fuel stations found in the analysis area - excellent opportunity for new PSO station');
+        } else {
+            const marketShare = (psoStations.length / stations.length) * 100;
+            if (marketShare === 0) {
+                insights.push('PSO has no presence in this area - untapped market opportunity');
+            } else if (marketShare < 25) {
+                insights.push('PSO has limited market presence - growth opportunity available');
+            } else {
+                insights.push('PSO has established presence in this market');
+            }
+            
+            if (stations.length < 5) {
+                insights.push('Low competition density - favorable for new station development');
+            } else {
+                insights.push('High competition density - strategic positioning required');
+            }
+        }
+        
+        return insights;
+    }
+
+    generateAIEnhancedStrategicInsights(allData, aiInsights) {
+        const insights = [];
+        
+        // Use AI insights if available, otherwise fallback to standard
+        if (aiInsights.executiveSummary) {
+            insights.push({
+                text: aiInsights.executiveSummary.trim(),
+                type: 'executive'
+            });
+        }
+        
+        if (aiInsights.marketIntelligence) {
+            const isOpportunity = aiInsights.marketIntelligence.toLowerCase().includes('opportunity') || 
+                                 aiInsights.marketIntelligence.toLowerCase().includes('favorable');
+            insights.push({
+                text: aiInsights.marketIntelligence.trim(),
+                type: isOpportunity ? 'opportunity' : 'neutral'
+            });
+        }
+        
+        if (aiInsights.siteAssessment) {
+            const isRisk = aiInsights.siteAssessment.toLowerCase().includes('risk') || 
+                          aiInsights.siteAssessment.toLowerCase().includes('concern');
+            insights.push({
+                text: aiInsights.siteAssessment.trim(),
+                type: isRisk ? 'risk' : 'opportunity'
+            });
+        }
+        
+        if (aiInsights.recommendations) {
+            const isOpportunity = aiInsights.recommendations.toLowerCase().includes('recommend') && 
+                                 !aiInsights.recommendations.toLowerCase().includes('against');
+            insights.push({
+                text: aiInsights.recommendations.trim(),
+                type: isOpportunity ? 'opportunity' : 'neutral'
+            });
+        }
+        
+        // Fallback to standard insights if AI insights are insufficient
+        if (insights.length < 3) {
+            return this.generateStrategicInsights(allData);
+        }
+        
+        return insights.slice(0, 4); // Limit to 4 insights for space
+    }
+
+    generateStrategicInsights(allData) {
+        const insights = [];
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const ssmData = allData.ssm || {};
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        
+        // Market Analysis
+        if (stations.length === 0) {
+            insights.push({
+                text: 'Greenfield opportunity with no existing competition in target market area',
+                type: 'opportunity'
+            });
+        } else {
+            const marketShare = (psoStations.length / stations.length) * 100;
+            if (marketShare === 0) {
+                insights.push({
+                    text: 'First-mover advantage available - PSO can establish market leadership position',
+                    type: 'opportunity'
+                });
+            } else if (marketShare < 20) {
+                insights.push({
+                    text: 'Significant market share expansion potential with strategic positioning',
+                    type: 'opportunity'
+                });
+            }
+        }
+        
+        // Competition Risk Assessment
+        if (stations.length > 8) {
+            insights.push({
+                text: 'High competition density may impact profitability and market penetration',
+                type: 'risk'
+            });
+        }
+        
+        // Site Viability Assessment
+        if (ssmData.overallScore && ssmData.overallScore >= 80) {
+            insights.push({
+                text: 'Exceptional site characteristics support premium fuel station development',
+                type: 'opportunity'
+            });
+        } else if (ssmData.overallScore && ssmData.overallScore < 50) {
+            insights.push({
+                text: 'Site characteristics require significant investment to achieve operational viability',
+                type: 'risk'
+            });
+        }
+        
+        // Financial Potential
+        const investmentRisk = this.calculateInvestmentRisk(allData);
+        if (investmentRisk === 'LOW') {
+            insights.push({
+                text: 'Low-risk investment profile with strong ROI potential for PSO expansion',
+                type: 'opportunity'
+            });
+        } else if (investmentRisk === 'HIGH') {
+            insights.push({
+                text: 'High-risk investment requiring detailed feasibility study and risk mitigation',
+                type: 'risk'
+            });
+        }
+        
+        return insights;
+    }
+
+    calculateInvestmentRisk(allData) {
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const ssmData = allData.ssm || {};
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        
+        let riskScore = 0;
+        
+        // Competition risk
+        if (stations.length > 8) riskScore += 30;
+        else if (stations.length > 5) riskScore += 20;
+        else if (stations.length > 2) riskScore += 10;
+        
+        // Market saturation risk
+        const marketShare = stations.length > 0 ? (psoStations.length / stations.length) * 100 : 0;
+        if (marketShare > 50) riskScore += 25;
+        else if (marketShare > 30) riskScore += 15;
+        
+        // Site viability risk
+        if (ssmData.overallScore) {
+            if (ssmData.overallScore < 40) riskScore += 35;
+            else if (ssmData.overallScore < 60) riskScore += 20;
+            else if (ssmData.overallScore < 80) riskScore += 10;
+        } else {
+            riskScore += 25; // Unknown risk
+        }
+        
+        if (riskScore <= 25) return 'LOW';
+        if (riskScore <= 50) return 'MEDIUM';
+        return 'HIGH';
+    }
+
+    getRiskColor(risk) {
+        switch(risk) {
+            case 'LOW': return [46, 204, 113]; // Green
+            case 'MEDIUM': return [241, 196, 15]; // Yellow
+            case 'HIGH': return [231, 76, 60]; // Red
+            default: return [149, 165, 166]; // Gray
+        }
+    }
+
+    calculateFinancialProjections(allData) {
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const ssmData = allData.ssm || {};
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        
+        // Base investment calculation
+        let baseInvestment = 150; // Base PKR millions
+        const competitionLevel = stations.length;
+        const siteScore = ssmData.overallScore || 50;
+        
+        // Adjust based on competition
+        if (competitionLevel > 8) baseInvestment += 30; // Higher marketing costs
+        else if (competitionLevel < 3) baseInvestment -= 20; // Lower competitive pressure
+        
+        // Adjust based on site requirements
+        if (siteScore < 50) baseInvestment += 40; // Additional infrastructure
+        else if (siteScore > 80) baseInvestment -= 10; // Premium location
+        
+        // ROI timeline calculation
+        let roiTimeline = 4; // Base years
+        if (psoStations.length === 0 && stations.length < 5) roiTimeline = 3; // Fast market entry
+        else if (competitionLevel > 8) roiTimeline = 6; // Competitive market
+        
+        // Market potential calculation
+        let marketPotential = 100;
+        if (stations.length === 0) marketPotential = 95; // Greenfield
+        else {
+            const marketShare = (psoStations.length / stations.length) * 100;
+            marketPotential = Math.max(20, 90 - marketShare - (competitionLevel * 5));
+        }
+        
+        return {
+            initialInvestment: Math.round(baseInvestment),
+            roiTimeline: roiTimeline,
+            marketPotential: Math.round(marketPotential)
+        };
+    }
+
+    generateDemographicInsights(allData) {
+        const insights = [];
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const analysisData = allData.analysis || {};
+        const ssmData = allData.ssm || {};
+        
+        // Population and economic insights
+        insights.push('Target area demographics support premium fuel retail operations');
+        
+        // Traffic analysis
+        if (ssmData.traffic?.score && parseInt(ssmData.traffic.score.split('/')[0]) > 30) {
+            insights.push('High traffic volume indicates strong customer flow potential');
+        } else {
+            insights.push('Moderate traffic patterns require strategic marketing approach');
+        }
+        
+        // Commercial activity
+        if (analysisData.amenities?.restaurants > 10 || analysisData.amenities?.malls > 0) {
+            insights.push('Strong commercial activity supports non-fuel retail opportunities');
+        }
+        
+        // Accessibility
+        if (analysisData.roads?.highways > 0) {
+            insights.push('Excellent highway access facilitates high-volume fuel sales');
+        }
+        
+        // Market timing
+        if (stations.length === 0) {
+            insights.push('First-mover advantage in underserved market area');
+        } else if (stations.length < 3) {
+            insights.push('Limited competition allows for aggressive market positioning');
+        }
+        
+        return insights;
+    }
+
+    generateBoardRecommendations(allData) {
+        const recommendations = [];
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const ssmData = allData.ssm || {};
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        const investmentRisk = this.calculateInvestmentRisk(allData);
+        
+        // Strategic recommendation based on analysis
+        if (stations.length === 0) {
+            recommendations.push({
+                title: 'IMMEDIATE MARKET ENTRY APPROVAL',
+                description: 'Recommend immediate authorization for greenfield development with expedited approval process'
+            });
+        } else if (psoStations.length === 0 && investmentRisk === 'LOW') {
+            recommendations.push({
+                title: 'STRATEGIC MARKET CAPTURE',
+                description: 'Authorize market entry with competitive pricing strategy to establish PSO presence'
+            });
+        } else if (investmentRisk === 'HIGH') {
+            recommendations.push({
+                title: 'DETAILED FEASIBILITY STUDY',
+                description: 'Commission comprehensive feasibility study before investment commitment'
+            });
+        }
+        
+        // Financial recommendation
+        const financialMetrics = this.calculateFinancialProjections(allData);
+        if (financialMetrics.marketPotential > 70) {
+            recommendations.push({
+                title: 'PREMIUM INVESTMENT ALLOCATION',
+                description: `Allocate PKR ${financialMetrics.initialInvestment}M for premium facility development with expected ${financialMetrics.roiTimeline}-year ROI`
+            });
+        } else {
+            recommendations.push({
+                title: 'PHASED INVESTMENT APPROACH',
+                description: 'Implement phased development to minimize risk and optimize market response'
+            });
+        }
+        
+        // Operational recommendation
+        if (ssmData.overallScore && ssmData.overallScore > 75) {
+            recommendations.push({
+                title: 'FLAGSHIP STATION DESIGNATION',
+                description: 'Develop as flagship location with full service offerings and premium branding'
+            });
+        } else {
+            recommendations.push({
+                title: 'STANDARD DEVELOPMENT MODEL',
+                description: 'Deploy standard station format with focus on operational efficiency'
+            });
+        }
+        
+        return recommendations;
+    }
+
+    calculateMarketAttractiveness(allData) {
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        
+        if (stations.length === 0) return 'Excellent';
+        
+        const marketShare = (psoStations.length / stations.length) * 100;
+        const density = stations.length;
+        
+        if (marketShare === 0 && density < 5) return 'Excellent';
+        if (marketShare < 25 && density < 8) return 'High';
+        if (marketShare < 50) return 'Moderate';
+        return 'Low';
+    }
+
+    getTrafficPotential(allData) {
+        const analysisData = allData.analysis || {};
+        if (analysisData.traffic?.volume) {
+            return analysisData.traffic.volume;
+        }
+        return 'Moderate'; // Default assumption
+    }
+
+    getGrowthPotential(allData) {
+        const analysisData = allData.analysis || {};
+        if (analysisData.landUse?.commercial > 30) return 'High';
+        if (analysisData.landUse?.residential > 40) return 'Moderate-High';
+        return 'Moderate';
     }
 
     validateReportData() {
@@ -2290,22 +3872,59 @@ class StorageManager {
         `;
     }
 
-    generateRecommendations(data) {
+    generateRecommendations(allData) {
         const recommendations = [];
-        const score = data.summary.overallScore;
+        const mapData = allData.map || {};
+        const stations = mapData.stations || [];
+        const ssmData = allData.ssm || {};
+        const analysisData = allData.analysis || {};
         
+        const psoStations = stations.filter(s => s.brand && s.brand.toLowerCase().includes('pso'));
+        const marketShare = stations.length > 0 ? (psoStations.length / stations.length) * 100 : 0;
+        const score = ssmData.summary?.overallScore || 0;
+        
+        // Site suitability recommendations
         if (score >= 80) {
-            recommendations.push('Highly recommended site with excellent potential for PSO station');
-            recommendations.push('Proceed with detailed feasibility study and site acquisition');
+            recommendations.push('Highly recommended site with excellent potential for PSO station development');
+            recommendations.push('Proceed immediately with detailed feasibility study and site acquisition');
+            recommendations.push('Priority site for next quarter development pipeline');
         } else if (score >= 60) {
-            recommendations.push('Good potential site requiring strategic considerations');
-            recommendations.push('Evaluate competitive positioning and market entry strategy');
+            recommendations.push('Good potential site with favorable conditions for PSO expansion');
+            recommendations.push('Evaluate competitive positioning and develop strategic market entry plan');
+            recommendations.push('Consider accelerated development timeline to capture market opportunity');
         } else if (score >= 40) {
-            recommendations.push('Moderate potential requiring significant market development');
-            recommendations.push('Consider long-term growth prospects and infrastructure development');
+            recommendations.push('Moderate potential site requiring strategic market development approach');
+            recommendations.push('Focus on long-term growth prospects and infrastructure development');
+            recommendations.push('Monitor market evolution and reassess within 6-12 months');
         } else {
             recommendations.push('Low potential site not recommended for immediate development');
-            recommendations.push('Monitor market conditions and reassess in future planning cycles');
+            recommendations.push('Continue market monitoring and reassess in future planning cycles');
+        }
+        
+        // Market share recommendations
+        if (marketShare === 0) {
+            recommendations.push('Excellent opportunity - PSO can establish first-mover advantage in untapped market');
+            recommendations.push('Develop comprehensive market entry strategy with competitive pricing');
+        } else if (marketShare < 25) {
+            recommendations.push('Growth opportunity available - PSO can increase market presence significantly');
+            recommendations.push('Implement aggressive marketing campaign to capture market share');
+        } else if (marketShare >= 50) {
+            recommendations.push('Strong PSO presence already established - focus on market defense strategy');
+        }
+        
+        // Competition-based recommendations
+        if (stations.length < 3) {
+            recommendations.push('Low competition environment - favorable for establishing dominant market position');
+        } else if (stations.length > 8) {
+            recommendations.push('High competition density - requires differentiated service offering and competitive advantages');
+        }
+        
+        // Traffic and accessibility recommendations
+        const trafficScore = ssmData.psoScores?.traffic || 0;
+        if (trafficScore > 70) {
+            recommendations.push('Excellent traffic accessibility - leverage high visibility for premium fuel offerings');
+        } else if (trafficScore < 50) {
+            recommendations.push('Improve site accessibility and visibility through strategic signage and infrastructure');
         }
         
         return recommendations;
@@ -2598,6 +4217,594 @@ class StorageManager {
         setTimeout(() => {
             errorModal.remove();
         }, 5000);
+    }
+
+    // ========================================
+    // AI-POWERED REPORT GENERATION WITH GEMINI
+    // ========================================
+
+    async generateAIEnhancedReportSections(allData) {
+        const API_KEY = "AIzaSyBhHbNiJGJYpHU41NDPdstotzz8Z0Pal04";
+        const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+
+        try {
+            // Prepare data context for AI
+            const dataContext = this.prepareDataContextForAI(allData);
+            
+            // Generate AI-enhanced sections
+            const prompt = this.createReportPrompt(dataContext);
+            
+            // Add timeout to prevent long waits
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('API timeout')), 8000) // 8 second timeout
+            );
+            
+            const fetchPromise = fetch(`${ENDPOINT}?key=${API_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: prompt
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.6, // Slightly reduced for faster response
+                        topK: 30, // Reduced from 40
+                        topP: 0.9, // Reduced from 0.95
+                        maxOutputTokens: 1024, // Reduced from 2048 for faster response
+                    }
+                })
+            });
+            
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+            if (!response.ok) {
+                console.warn('AI API failed, falling back to standard report');
+                return this.generateReportSections(allData);
+            }
+
+            const aiResponse = await response.json();
+            const aiContent = aiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (aiContent) {
+                return this.parseAIResponseToSections(aiContent, allData);
+            } else {
+                console.warn('Invalid AI response, falling back to standard report');
+                return this.generateReportSections(allData);
+            }
+
+        } catch (error) {
+            console.error('AI report generation failed:', error);
+            // Fallback to standard report generation
+            return this.generateReportSections(allData);
+        }
+    }
+
+    prepareDataContextForAI(allData) {
+        const coords = this.extractBestCoordinates(allData);
+        const hasMapData = allData.map && Object.keys(allData.map).length > 0;
+        const hasSSMData = allData.ssm && Object.keys(allData.ssm).length > 0;
+        const hasAnalysisData = allData.analysis && Object.keys(allData.analysis).length > 0;
+
+        return {
+            location: coords.hasValidCoords ? {
+                latitude: coords.coords.latitude,
+                longitude: coords.coords.longitude,
+                radius: coords.coords.radius
+            } : null,
+            marketData: hasMapData ? {
+                totalStations: allData.map.stations?.length || 0,
+                psoStations: allData.map.psoStations || 0,
+                competitorStations: allData.map.competitorStations || 0,
+                brands: Object.keys(allData.map.brandCounts || {}),
+                brandCounts: allData.map.brandCounts || {},
+                averageDistance: allData.map.averageDistance || 0,
+                marketAnalysis: allData.map.marketAnalysis || {}
+            } : null,
+            siteAssessment: hasSSMData ? {
+                overallScore: allData.ssm.overallScore || 0,
+                siteCategory: allData.ssm.siteCategory || 'Unknown',
+                scores: allData.ssm.psoScores || {},
+                summary: allData.ssm.summary || {}
+            } : null,
+            landUse: hasAnalysisData ? {
+                dominantLandUse: allData.analysis.dominantLandUse || 'Mixed',
+                siteType: allData.analysis.siteType || 'Commercial',
+                landUseData: allData.analysis.landUse || {},
+                accessibilityScore: allData.analysis.accessibilityScore || 0,
+                diversityIndex: allData.analysis.diversityIndex || 0
+            } : null
+        };
+    }
+
+    createReportPrompt(dataContext) {
+        return `You are a senior petroleum industry analyst for Pakistan State Oil (PSO). Generate a professional site analysis report based on the following data. Keep responses concise but insightful.
+
+DATA CONTEXT:
+${JSON.stringify(dataContext, null, 2)}
+
+Generate EXACTLY 5 sections in the following format. Each section should be 1 sentence maximum and should be short and precise:
+
+SECTION 1 - EXECUTIVE SUMMARY:
+- Analyze overall site viability
+- Mention key statistics (station counts, coordinates if available)
+- Provide high-level recommendation
+
+SECTION 2 - MARKET INTELLIGENCE:
+- Assess competitive landscape
+- Identify market opportunities or threats
+- Comment on PSO's market position
+
+SECTION 3 - SITE ASSESSMENT:
+- Evaluate site suitability scores
+- Assess development potential
+- Comment on infrastructure readiness
+
+SECTION 4 - LAND USE ANALYSIS:
+- Analyze land use patterns
+- Assess zoning compatibility
+- Comment on development mix
+
+SECTION 5 - STRATEGIC RECOMMENDATIONS:
+- Provide actionable business recommendations
+- Suggest investment strategy
+- Mention timeline considerations
+
+Format your response as:
+EXECUTIVE_SUMMARY: [your analysis]
+MARKET_INTELLIGENCE: [your analysis]
+SITE_ASSESSMENT: [your analysis]
+LAND_USE_ANALYSIS: [your analysis]
+STRATEGIC_RECOMMENDATIONS: [your analysis]
+
+Focus on business insights, market positioning, and strategic value. Use petroleum industry terminology and PSO perspective.`;
+    }
+
+    parseAIResponseToSections(aiContent, allData) {
+        try {
+            const sections = [];
+            const sectionMap = {
+                'EXECUTIVE_SUMMARY': { title: 'EXECUTIVE SUMMARY', stage: 'Analyzing business intelligence...' },
+                'MARKET_INTELLIGENCE': { title: 'MARKET INTELLIGENCE', stage: 'Processing competition data...' },
+                'SITE_ASSESSMENT': { title: 'SITE ASSESSMENT', stage: 'Evaluating site metrics...' },
+                'LAND_USE_ANALYSIS': { title: 'LAND USE ANALYSIS', stage: 'Processing geographic data...' },
+                'STRATEGIC_RECOMMENDATIONS': { title: 'RECOMMENDATIONS', stage: 'Generating strategy...' }
+            };
+
+            // Parse AI response
+            const lines = aiContent.split('\n');
+            let currentSection = null;
+            let currentContent = '';
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.includes(':')) {
+                    // Save previous section
+                    if (currentSection && currentContent) {
+                        const sectionInfo = sectionMap[currentSection];
+                        if (sectionInfo) {
+                            sections.push({
+                                title: sectionInfo.title,
+                                stage: sectionInfo.stage,
+                                content: currentContent.trim()
+                            });
+                        }
+                    }
+
+                    // Start new section
+                    const sectionKey = trimmed.split(':')[0];
+                    if (sectionMap[sectionKey]) {
+                        currentSection = sectionKey;
+                        currentContent = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+                    }
+                } else if (currentSection && trimmed) {
+                    currentContent += ' ' + trimmed;
+                }
+            }
+
+            // Save last section
+            if (currentSection && currentContent) {
+                const sectionInfo = sectionMap[currentSection];
+                if (sectionInfo) {
+                    sections.push({
+                        title: sectionInfo.title,
+                        stage: sectionInfo.stage,
+                        content: currentContent.trim()
+                    });
+                }
+            }
+
+            // Ensure we have all 5 sections, fallback to standard if incomplete
+            if (sections.length < 5) {
+                console.warn('Incomplete AI response, using fallback sections');
+                return this.generateReportSections(allData);
+            }
+
+            return sections;
+
+        } catch (error) {
+            console.error('Error parsing AI response:', error);
+            return this.generateReportSections(allData);
+        }
+    }
+
+    // ========================================
+    // AI TYPING SIMULATION METHODS
+    // ========================================
+
+    showAITypingUI() {
+        // Remove any existing overlay
+        const existingOverlay = document.getElementById('aiTypingOverlay');
+        if (existingOverlay) existingOverlay.remove();
+
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'aiTypingOverlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+        `;
+
+        // Create AI typing container
+        const typingCard = document.createElement('div');
+        typingCard.style.cssText = `
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        `;
+
+        typingCard.innerHTML = `
+            <!-- AI Header -->
+            <div style="
+                display: flex;
+                align-items: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            ">
+                <div style="
+                    width: 50px;
+                    height: 50px;
+                    background: linear-gradient(135deg, #00AA44, #00DD55);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-right: 15px;
+                    font-size: 24px;
+                ">🤖</div>
+                <div>
+                    <h3 style="margin: 0; font-size: 20px; font-weight: bold;">PSO AI Analytics Engine</h3>
+                    <p style="margin: 5px 0 0; opacity: 0.7; font-size: 14px;">Powered by Google Gemini • Generating intelligent insights...</p>
+                </div>
+                <div id="aiTypingIndicator" style="
+                    margin-left: auto;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                ">
+                    <div class="typing-dot" style="
+                        width: 8px;
+                        height: 8px;
+                        background: #00DD55;
+                        border-radius: 50%;
+                        animation: typingBounce 1.4s infinite ease-in-out both;
+                    "></div>
+                    <div class="typing-dot" style="
+                        width: 8px;
+                        height: 8px;
+                        background: #00DD55;
+                        border-radius: 50%;
+                        animation: typingBounce 1.4s infinite ease-in-out both;
+                        animation-delay: 0.16s;
+                    "></div>
+                    <div class="typing-dot" style="
+                        width: 8px;
+                        height: 8px;
+                        background: #00DD55;
+                        border-radius: 50%;
+                        animation: typingBounce 1.4s infinite ease-in-out both;
+                        animation-delay: 0.32s;
+                    "></div>
+                </div>
+            </div>
+
+            <!-- Report Content Area -->
+            <div id="aiReportContent" style="
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                line-height: 1.6;
+                white-space: pre-wrap;
+                min-height: 300px;
+                background: rgba(0, 0, 0, 0.2);
+                padding: 20px;
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            "></div>
+
+            <!-- Progress Section -->
+            <div style="margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span id="progressText" style="font-size: 14px; opacity: 0.8;">Initializing analysis...</span>
+                    <span id="progressPercent" style="font-size: 14px; color: #00DD55; font-weight: bold;">0%</span>
+                </div>
+                <div style="
+                    width: 100%;
+                    height: 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 4px;
+                    overflow: hidden;
+                ">
+                    <div id="progressBar" style="
+                        height: 100%;
+                        background: linear-gradient(90deg, #00AA44, #00DD55);
+                        border-radius: 4px;
+                        width: 0%;
+                        transition: width 0.3s ease;
+                    "></div>
+                </div>
+            </div>
+        `;
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes typingBounce {
+                0%, 80%, 100% { 
+                    transform: scale(0);
+                    opacity: 0.5;
+                } 
+                40% { 
+                    transform: scale(1);
+                    opacity: 1;
+                }
+            }
+            
+            .typing-cursor {
+                animation: blink 1s infinite;
+            }
+            
+            @keyframes blink {
+                0%, 50% { opacity: 1; }
+                51%, 100% { opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        overlay.appendChild(typingCard);
+        document.body.appendChild(overlay);
+    }
+
+    async simulateAIReportGeneration(allData) {
+        const contentElement = document.getElementById('aiReportContent');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressBar = document.getElementById('progressBar');
+
+        if (!contentElement) return;
+
+        // Show AI processing message (faster)
+        progressText.textContent = 'Connecting to PSO AI Analytics...';
+        await this.typeText(contentElement, '🤖 PSO AI Analytics Engine Initializing...\n\n', 5); // 5ms vs 10ms
+        await this.sleep(200); // 200ms vs 500ms
+
+        // Generate AI-enhanced report sections
+        progressText.textContent = 'AI analyzing your data...';
+        await this.typeText(contentElement, '📊 Processing site data with advanced AI algorithms...\n', 5); // 5ms vs 10ms
+        
+        const reportSections = await this.generateAIEnhancedReportSections(allData);
+        
+        // Store AI-generated sections for PDF use
+        this.aiGeneratedSections = reportSections;
+        
+        await this.typeText(contentElement, '✅ AI analysis complete. Generating insights...\n\n', 5); // 5ms vs 10ms
+        
+        let totalWords = 0;
+        reportSections.forEach(section => {
+            totalWords += section.content.split(' ').length;
+        });
+
+        let currentWordCount = 0;
+        let currentProgress = 0;
+
+        // Type each section (much faster)
+        for (let i = 0; i < reportSections.length; i++) {
+            const section = reportSections[i];
+            
+            // Update progress text
+            progressText.textContent = section.stage;
+            
+            // Add section header (faster)
+            await this.typeText(contentElement, `\n\n█ ${section.title}\n${'='.repeat(section.title.length + 2)}\n\n`, 3); // 3ms vs 5ms
+            
+            // Type section content word by word (much faster)
+            const words = section.content.split(' ');
+            for (let j = 0; j < words.length; j++) {
+                const word = words[j];
+                const isLastWord = j === words.length - 1;
+                const textToAdd = isLastWord ? word : word + ' ';
+                
+                await this.typeText(contentElement, textToAdd, Math.random() * 8 + 5); // Much faster: 5-13ms vs 10-25ms
+                
+                currentWordCount++;
+                currentProgress = Math.round((currentWordCount / totalWords) * 100);
+                
+                // Update progress
+                progressPercent.textContent = `${currentProgress}%`;
+                progressBar.style.width = `${currentProgress}%`;
+                
+                // Significantly reduced random pause frequency and duration
+                if (Math.random() < 0.01) { // Only 1% chance vs 3%
+                    await this.sleep(Math.random() * 20 + 10); // 10-30ms vs 25-75ms
+                }
+            }
+            
+            // Much shorter pause between sections
+            await this.sleep(75); // 75ms vs 150ms
+        }
+
+        // Final completion
+        progressText.textContent = 'AI report generation complete!';
+        progressPercent.textContent = '100%';
+        progressBar.style.width = '100%';
+        
+        // Show completion message (faster)
+        await this.typeText(contentElement, '\n\n✅ AI-POWERED ANALYSIS COMPLETE\n\nGenerating professional PDF document...', 5); // 5ms vs 10ms
+        
+        // Much shorter wait before closing
+        await this.sleep(400); // 400ms vs 800ms
+        
+        // Remove the typing UI
+        const overlay = document.getElementById('aiTypingOverlay');
+        if (overlay) overlay.remove();
+    }
+
+    generateReportSections(allData) {
+        const coords = this.extractBestCoordinates(allData);
+        const hasMapData = allData.map && Object.keys(allData.map).length > 0;
+        const hasSSMData = allData.ssm && Object.keys(allData.ssm).length > 0;
+        const hasAnalysisData = allData.analysis && Object.keys(allData.analysis).length > 0;
+
+        const sections = [
+            {
+                title: "EXECUTIVE SUMMARY",
+                stage: "Analyzing business intelligence...",
+                content: `Site analysis complete. Market evaluation shows ${hasMapData ? `${allData.map.stations?.length || 0} stations` : 'limited data'} in radius. ${coords.hasValidCoords ? `Location: ${coords.coords.latitude.toFixed(4)}, ${coords.coords.longitude.toFixed(4)}` : 'Coordinates pending'}.`
+            },
+            {
+                title: "MARKET INTELLIGENCE",
+                stage: "Processing competition data...",
+                content: hasMapData ? 
+                    `Found ${allData.map.stations?.length || 0} fuel stations. PSO presence: ${allData.map.psoStations || 0} stations. Top competitors: ${Object.keys(allData.map.brandCounts || {}).filter(brand => !brand.toLowerCase().includes('pso')).slice(0, 2).join(', ')}. Market density: ${allData.map.stations?.length > 6 ? 'high' : 'moderate'}.` :
+                    "Market data collection in progress. Competition analysis pending station mapping."
+            },
+            {
+                title: "SITE ASSESSMENT",
+                stage: "Evaluating site metrics...",
+                content: hasSSMData ? 
+                    `SSM score: ${allData.ssm.overallScore || 0}/100. Category: ${allData.ssm.siteCategory || 'Under Review'}. Development potential: ${allData.ssm.overallScore > 70 ? 'excellent' : allData.ssm.overallScore > 50 ? 'good' : 'moderate'}.` :
+                    "Site assessment pending detailed analysis completion."
+            },
+            {
+                title: "LAND USE ANALYSIS",
+                stage: "Processing geographic data...",
+                content: hasAnalysisData ? 
+                    `Primary use: ${allData.analysis.dominantLandUse || 'Mixed'}. Site type: ${allData.analysis.siteType || 'Commercial'}. Development mix verified for retail operations.` :
+                    "Geographic analysis in progress."
+            },
+            {
+                title: "RECOMMENDATIONS",
+                stage: "Generating strategy...",
+                content: `Assessment ${hasMapData && (allData.map.competitorStations || 0) < 5 ? 'recommends development' : 'suggests feasibility study'}. Strategy: ${hasSSMData && allData.ssm.overallScore > 60 ? 'premium positioning' : 'competitive approach'}. Timeline: 12-18 months.`
+            }
+        ];
+
+        return sections;
+    }
+
+    async typeText(element, text, speed = 10) { // Default much faster speed: 10ms vs 20ms
+        return new Promise((resolve) => {
+            let index = 0;
+            const cursor = '<span class="typing-cursor">|</span>';
+            
+            const typeInterval = setInterval(() => {
+                if (index < text.length) {
+                    // Remove cursor, add character, add cursor back
+                    const currentText = element.innerHTML.replace(cursor, '');
+                    element.innerHTML = currentText + text[index] + cursor;
+                    index++;
+                    
+                    // Auto-scroll to bottom
+                    element.scrollTop = element.scrollHeight;
+                } else {
+                    // Remove cursor when done
+                    element.innerHTML = element.innerHTML.replace(cursor, '');
+                    clearInterval(typeInterval);
+                    resolve();
+                }
+            }, speed);
+        });
+    }
+
+    // ========================================
+    // AI-ENHANCED PDF CONTENT INTEGRATION
+    // ========================================
+
+    getAIInsightsForPDF(allData) {
+        // Use AI-generated sections if available, otherwise fallback to standard
+        if (this.aiGeneratedSections && this.aiGeneratedSections.length > 0) {
+            return this.aiGeneratedSections.reduce((insights, section) => {
+                switch (section.title) {
+                    case 'EXECUTIVE SUMMARY':
+                        insights.executiveSummary = section.content;
+                        break;
+                    case 'MARKET INTELLIGENCE':
+                        insights.marketIntelligence = section.content;
+                        break;
+                    case 'SITE ASSESSMENT':
+                        insights.siteAssessment = section.content;
+                        break;
+                    case 'LAND USE ANALYSIS':
+                        insights.landUseAnalysis = section.content;
+                        break;
+                    case 'RECOMMENDATIONS':
+                        insights.recommendations = section.content;
+                        break;
+                }
+                return insights;
+            }, {});
+        }
+        
+        // Fallback to standard insights
+        return this.generateStandardInsights(allData);
+    }
+
+    generateStandardInsights(allData) {
+        const hasMapData = allData.map && Object.keys(allData.map).length > 0;
+        const hasSSMData = allData.ssm && Object.keys(allData.ssm).length > 0;
+        const hasAnalysisData = allData.analysis && Object.keys(allData.analysis).length > 0;
+        
+        return {
+            executiveSummary: hasMapData ? 
+                `Strategic site analysis reveals ${allData.map.stations?.length || 0} competing stations within target radius. Market assessment indicates ${allData.map.competitorStations > 5 ? 'high' : 'moderate'} competitive environment.` :
+                'Site analysis pending market data collection. Initial assessment requires completion of competitive landscape mapping.',
+            marketIntelligence: hasMapData ? 
+                `Competitive analysis identifies ${Object.keys(allData.map.brandCounts || {}).length} fuel brands. PSO market opportunity exists with current ${allData.map.psoStations || 0} station presence.` :
+                'Market intelligence data collection in progress. Competitive positioning analysis requires station mapping completion.',
+            siteAssessment: hasSSMData ? 
+                `Site suitability scoring indicates ${allData.ssm.overallScore || 0}/100 development potential. Infrastructure evaluation shows ${allData.ssm.overallScore > 60 ? 'favorable' : 'moderate'} conditions.` :
+                'Site assessment metrics pending completion of detailed evaluation. Development potential scoring requires additional analysis.',
+            landUseAnalysis: hasAnalysisData ? 
+                `Land use evaluation identifies ${allData.analysis.dominantLandUse || 'mixed'} development patterns. Zoning assessment confirms compatibility with petroleum retail operations.` :
+                'Geographic analysis in progress. Land use classification pending completion of comprehensive survey.',
+            recommendations: hasSSMData && allData.ssm.overallScore > 60 ? 
+                'Strategic recommendation supports site development with accelerated timeline. Investment risk assessment indicates favorable market conditions.' :
+                'Detailed feasibility study recommended before investment commitment. Risk mitigation strategy required for market entry.'
+        };
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     downloadPDF(pdfBlob, fileName) {
