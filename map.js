@@ -4,7 +4,9 @@ let map;
         let currentStations = [];
         let filteredStations = [];
         let distanceLabelsGroup = null;
+        let connectionLinesGroup = null;
         let showDistances = true;
+        let showLines = true;
 
 // Edit Map variables
 let editMode = false;
@@ -19,15 +21,18 @@ let elementIdCounter = 0;
             
             // Layer Control
             const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 55
             });
             
             const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: '© Esri'
+                attribution: '© Esri',
+                maxZoom: 24 // Increased zoom level for more detail
             });
             
             const terrainLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenTopoMap'
+                attribution: '© OpenTopoMap',
+                maxZoom: 18
             });
 
             // Add default layer
@@ -268,6 +273,21 @@ let elementIdCounter = 0;
                     map.removeLayer(layer);
                 }
             });
+            
+            // Clear distance labels and connection lines
+            if (distanceLabelsGroup) {
+                distanceLabelsGroup.clearLayers();
+            }
+            if (connectionLinesGroup) {
+                connectionLinesGroup.clearLayers();
+            }
+        }
+
+        // Clear all data including station arrays
+        function clearAllData() {
+            currentStations = [];
+            filteredStations = [];
+            clearMap();
         }
 
         // Show loading state with progressive steps
@@ -2023,14 +2043,23 @@ function addStationMarkers(stations) {
 
 // Add connection line (straight line for visual)
 function addConnectionLine(searchLat, searchLng, station, isPSO) {
+    if (!showLines) return;
+    
     const latlngs = [[searchLat, searchLng], [station.lat, station.lng]];
 
-    L.polyline(latlngs, {
+    const line = L.polyline(latlngs, {
         color: isPSO ? '#10b981' : '#ef4444',
         weight: 3,
         opacity: 0.8,
         className: isPSO ? 'glow-line-green' : 'glow-line-red'
-    }).addTo(map);
+    });
+
+    // Initialize connection lines group if it doesn't exist
+    if (!connectionLinesGroup) {
+        connectionLinesGroup = L.layerGroup().addTo(map);
+    }
+    
+    connectionLinesGroup.addLayer(line);
 }
 
 // Add accurate distance label (shows routing service calculated distance)
@@ -2083,25 +2112,34 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
 
         // Add connection line between search point and station
         function addConnectionLine(searchLat, searchLng, station, isPSO) {
+            if (!showLines) return;
+            
             const latlngs = [[searchLat, searchLng], [station.lat, station.lng]];
 
-            if (isPSO) {
+            const line = isPSO ? 
                 // Green solid line for PSO stations
                 L.polyline(latlngs, {
                     color: '#10b981',
-                    weight: 3,
+                    weight: 4,
                     opacity: 0.9,
+                    dashArray: null,
                     className: 'glow-line-green'
-                }).addTo(map);
-            } else {
-                // Red solid line for other stations
+                }) :
+                // Red dashed line for competitors
                 L.polyline(latlngs, {
                     color: '#ef4444',
                     weight: 3,
                     opacity: 0.8,
+                    dashArray: '10, 10',
                     className: 'glow-line-red'
-                }).addTo(map);
+                });
+
+            // Initialize connection lines group if it doesn't exist
+            if (!connectionLinesGroup) {
+                connectionLinesGroup = L.layerGroup().addTo(map);
             }
+            
+            connectionLinesGroup.addLayer(line);
         }
 
         // Add distance label on the line
@@ -2167,12 +2205,20 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 map.removeLayer(distanceLabelsGroup);
                 distanceLabelsGroup = null;
             }
+            
+            // Clear and remove connection lines group
+            if (connectionLinesGroup) {
+                connectionLinesGroup.clearLayers();
+                map.removeLayer(connectionLinesGroup);
+                connectionLinesGroup = null;
+            }
         }
 
         // Toggle distance labels visibility
         function toggleDistances() {
             showDistances = !showDistances;
             const toggleBtn = document.getElementById('distance-toggle-btn');
+            const toggleText = document.getElementById('distance-toggle-text');
             
             if (showDistances) {
                 // Show distances - redraw all station markers with distances
@@ -2193,16 +2239,59 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                     }
                 }
                 
-                toggleBtn.innerHTML = '<i class="fas fa-ruler mr-2"></i>Hide Distances';
-                toggleBtn.className = 'bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center';
+                if (toggleText) {
+                    toggleText.textContent = 'Hide Distances';
+                }
             } else {
                 // Hide distances
                 if (distanceLabelsGroup) {
                     distanceLabelsGroup.clearLayers();
                 }
                 
-                toggleBtn.innerHTML = '<i class="fas fa-ruler mr-2"></i>Show Distances';
-                toggleBtn.className = 'bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center';
+                if (toggleText) {
+                    toggleText.textContent = 'Show Distances';
+                }
+            }
+        }
+
+        // Toggle connection lines visibility
+        function toggleLines() {
+            showLines = !showLines;
+            const toggleBtn = document.getElementById('lines-toggle-btn');
+            const toggleText = document.getElementById('lines-toggle-text');
+            
+            if (showLines) {
+                // Show lines - redraw all connection lines
+                if (currentStations && currentStations.length > 0) {
+                    // Clear existing lines
+                    if (connectionLinesGroup) {
+                        connectionLinesGroup.clearLayers();
+                    }
+                    
+                    // Redraw connection lines
+                    const searchLat = parseFloat(document.getElementById('latitude').value);
+                    const searchLng = parseFloat(document.getElementById('longitude').value);
+                    
+                    if (!isNaN(searchLat) && !isNaN(searchLng)) {
+                        currentStations.forEach(station => {
+                            const isPSO = station.brand === 'PSO';
+                            addConnectionLine(searchLat, searchLng, station, isPSO);
+                        });
+                    }
+                }
+                
+                if (toggleText) {
+                    toggleText.textContent = 'Hide Lines';
+                }
+            } else {
+                // Hide lines
+                if (connectionLinesGroup) {
+                    connectionLinesGroup.clearLayers();
+                }
+                
+                if (toggleText) {
+                    toggleText.textContent = 'Show Lines';
+                }
             }
         }
 
@@ -2258,7 +2347,7 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
             }, 100);
         }
 
-        // Export map as image
+        // Export map as ultra-clean high-quality image - BEST APPROACH
         function exportMap(buttonElement) {
             try {
                 // Get the button that triggered the export
@@ -2270,7 +2359,7 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 }
 
                 const originalText = exportBtn.innerHTML;
-                exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Exporting...';
+                exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing Clean Export...';
                 exportBtn.disabled = true;
 
                 // Check if map is initialized
@@ -2282,115 +2371,246 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                     return;
                 }
 
-                console.log('Starting map export...');
+                console.log('🚀 Starting ultra-clean map export...');
 
-                // Method 1: Try leaflet-image first
-                if (typeof leafletImage !== 'undefined' && window.leafletImage) {
-                    console.log('Using leaflet-image plugin...');
+                // Use the most efficient clean export approach
+                performUltraCleanExport();
+
+                function performUltraCleanExport() {
+                    const mapElement = document.getElementById('map');
+                    const currentZoom = map.getZoom();
+                    const currentCenter = map.getCenter();
                     
-                    window.leafletImage(map, function(err, canvas) {
-                        if (err) {
-                            console.error('Leaflet-image export error:', err);
-                            // Fallback to html2canvas
-                            tryHtml2CanvasExport();
-                            return;
-                        }
-                        
-                        try {
-                            // Create download link
-                            const link = document.createElement('a');
-                            link.download = `fuel-stations-map-${new Date().getTime()}.png`;
-                            link.href = canvas.toDataURL('image/png');
-                            
-                            // Trigger download
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            
-                            // Reset button
-                            exportBtn.innerHTML = originalText;
-                            exportBtn.disabled = false;
-                            
-                            alert('Map exported successfully!');
-                            console.log('Map export completed successfully');
-                            
-                        } catch (downloadError) {
-                            console.error('Download error:', downloadError);
-                            tryHtml2CanvasExport();
+                    // Store original tile layer for restoration
+                    let originalTileLayer = null;
+                    map.eachLayer(layer => {
+                        if (layer instanceof L.TileLayer) {
+                            originalTileLayer = layer;
                         }
                     });
-                } else {
-                    console.log('Leaflet-image not available, using html2canvas...');
-                    tryHtml2CanvasExport();
-                }
 
-                // Fallback method using html2canvas
-                function tryHtml2CanvasExport() {
-                    console.log('Attempting html2canvas export...');
+                    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Switching to Clean Style...';
+
+                    // Remove current tile layer
+                    if (originalTileLayer) {
+                        map.removeLayer(originalTileLayer);
+                    }
+
+                    // Use the CLEANEST possible tile layer - CartoDB Positron (roads + names only)
+                    const ultraCleanLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+                        attribution: '© CARTO © OpenStreetMap',
+                        subdomains: 'abcd',
+                        maxZoom: 20,
+                        crossOrigin: true
+                    });
+
+                    // Add labels layer separately for better control
+                    const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+                        attribution: '',
+                        subdomains: 'abcd', 
+                        maxZoom: 20,
+                        crossOrigin: true,
+                        pane: 'overlayPane'
+                    });
+
+                    // Add clean layers to map
+                    ultraCleanLayer.addTo(map);
+                    labelsLayer.addTo(map);
+
+                    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading Clean Tiles...';
+
+                    // Wait for clean tiles to load completely
+                    let tilesLoaded = 0;
+                    let totalTiles = 0;
+                    let labelsLoaded = 0;
+                    let totalLabels = 0;
                     
-                    // Load html2canvas dynamically
-                    if (typeof html2canvas === 'undefined') {
-                        const script = document.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-                        script.onload = function() {
-                            performHtml2CanvasExport();
-                        };
-                        script.onerror = function() {
-                            console.error('Failed to load html2canvas');
-                            alert('Export functionality not available. Please try refreshing the page.');
-                            exportBtn.innerHTML = originalText;
-                            exportBtn.disabled = false;
-                        };
-                        document.head.appendChild(script);
-                    } else {
-                        performHtml2CanvasExport();
+                    const checkAllTilesLoaded = () => {
+                        if (tilesLoaded >= totalTiles && labelsLoaded >= totalLabels && 
+                            totalTiles > 0 && totalLabels > 0) {
+                            console.log(`✅ All tiles loaded: ${totalTiles} base + ${totalLabels} labels`);
+                            
+                            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing High-Quality Capture...';
+                            
+                            setTimeout(() => {
+                                performActualCleanCapture();
+                            }, 1000);
+                        }
+                    };
+
+                    // Track base layer tiles
+                    ultraCleanLayer.on('tileloadstart', () => { totalTiles++; });
+                    ultraCleanLayer.on('tileload', () => { tilesLoaded++; checkAllTilesLoaded(); });
+                    ultraCleanLayer.on('tileerror', () => { tilesLoaded++; checkAllTilesLoaded(); });
+
+                    // Track labels layer tiles  
+                    labelsLayer.on('tileloadstart', () => { totalLabels++; });
+                    labelsLayer.on('tileload', () => { labelsLoaded++; checkAllTilesLoaded(); });
+                    labelsLayer.on('tileerror', () => { labelsLoaded++; checkAllTilesLoaded(); });
+
+                    // Fallback timeout
+                    setTimeout(() => {
+                        if (tilesLoaded < totalTiles || labelsLoaded < totalLabels) {
+                            console.log('⚠️ Tile loading timeout, proceeding with export...');
+                            performActualCleanCapture();
+                        }
+                    }, 8000);
+
+                    function performActualCleanCapture() {
+                        exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Capturing Ultra-Clean Image...';
+
+                        // Hide ALL UI elements except fuel station markers
+                        const elementsToHide = [
+                            '.leaflet-control-container',
+                            '.leaflet-control-zoom',
+                            '.leaflet-control-attribution', 
+                            '.leaflet-control-layers',
+                            '.leaflet-popup',
+                            '.leaflet-tooltip'
+                        ];
+                        
+                        const hiddenElements = [];
+                        elementsToHide.forEach(selector => {
+                            const elements = document.querySelectorAll(selector);
+                            elements.forEach(el => {
+                                hiddenElements.push({element: el, originalDisplay: el.style.display});
+                                el.style.display = 'none';
+                            });
+                        });
+
+                        // Force map refresh
+                        map.invalidateSize();
+
+                        setTimeout(() => {
+                            // Try multiple capture methods for best quality
+                            attemptBestQualityCapture();
+                        }, 1500);
+
+                        function attemptBestQualityCapture() {
+                            const scale = 4; // Ultra high quality - 4x resolution
+                            const rect = mapElement.getBoundingClientRect();
+                            
+                            console.log(`📸 Capturing at ${scale}x quality: ${rect.width * scale}x${rect.height * scale}px`);
+
+                            // Method 1: Try html2canvas with optimal settings
+                            html2canvas(mapElement, {
+                                useCORS: true,
+                                allowTaint: true,
+                                backgroundColor: '#ffffff',
+                                scale: scale,
+                                width: rect.width,
+                                height: rect.height,
+                                scrollX: 0,
+                                scrollY: 0,
+                                logging: false,
+                                imageTimeout: 30000,
+                                removeContainer: false,
+                                foreignObjectRendering: true,
+                                letterRendering: true,
+                                onclone: function(clonedDoc) {
+                                    // Ensure perfect rendering in clone
+                                    const clonedMap = clonedDoc.getElementById('map');
+                                    if (clonedMap) {
+                                        clonedMap.style.background = '#ffffff';
+                                        clonedMap.style.position = 'relative';
+                                    }
+                                    
+                                    // Enhance tile visibility
+                                    const tiles = clonedDoc.querySelectorAll('.leaflet-tile');
+                                    tiles.forEach(tile => {
+                                        tile.style.opacity = '1';
+                                        tile.style.imageRendering = 'crisp-edges';
+                                        tile.style.filter = 'contrast(1.1) brightness(1.05)';
+                                    });
+
+                                    // Enhance fuel station markers
+                                    const markers = clonedDoc.querySelectorAll('.custom-marker, .custom-search-marker');
+                                    markers.forEach(marker => {
+                                        marker.style.filter = 'drop-shadow(0 3px 6px rgba(0,0,0,0.4))';
+                                        marker.style.zIndex = '2000';
+                                    });
+                                },
+                                ignoreElements: function(element) {
+                                    return element.classList && (
+                                        element.classList.contains('leaflet-control-zoom') ||
+                                        element.classList.contains('leaflet-control-attribution') ||
+                                        element.classList.contains('leaflet-popup') ||
+                                        element.classList.contains('leaflet-tooltip')
+                                    );
+                                }
+                            }).then(canvas => {
+                                console.log('✅ Ultra-clean capture successful!');
+                                
+                                // Create ultra high-quality PNG
+                                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                                
+                                // Download the image
+                                const link = document.createElement('a');
+                                const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                                link.download = `fuel-stations-ultra-clean-${timestamp}-4K.png`;
+                                link.href = dataUrl;
+                                
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                // Restore everything
+                                restoreOriginalMap();
+                                
+                                // Calculate file size
+                                const fileSizeMB = Math.round(dataUrl.length * 0.75 / 1024 / 1024 * 100) / 100;
+                                
+                                // Show success popup
+                                showExportSuccessPopup({
+                                    resolution: `${canvas.width}×${canvas.height}px (4K Quality)`,
+                                    fileSize: `~${fileSizeMB}MB`,
+                                    style: 'Ultra Clean - Roads & Names Only',
+                                    quality: 'Ultra High (4x) - Crystal Clear'
+                                });
+                                
+                                console.log('🎉 Ultra-clean export completed successfully!');
+                                
+                            }).catch(error => {
+                                console.error('❌ Capture failed:', error);
+                                restoreOriginalMap();
+                                showExportErrorPopup('High-quality capture failed. Please try again or check your browser compatibility.');
+                            });
+                        }
+
+                        function restoreOriginalMap() {
+                            try {
+                                // Remove clean layers
+                                map.removeLayer(ultraCleanLayer);
+                                map.removeLayer(labelsLayer);
+                                
+                                // Restore original tile layer
+                                if (originalTileLayer) {
+                                    originalTileLayer.addTo(map);
+                                }
+                                
+                                // Restore hidden elements
+                                hiddenElements.forEach(item => {
+                                    item.element.style.display = item.originalDisplay;
+                                });
+                                
+                                // Reset button
+                                exportBtn.innerHTML = originalText;
+                                exportBtn.disabled = false;
+                                
+                                console.log('🔄 Map restored to original state');
+                                
+                            } catch (restoreError) {
+                                console.error('❌ Error restoring map:', restoreError);
+                                exportBtn.innerHTML = originalText;
+                                exportBtn.disabled = false;
+                            }
+                        }
                     }
                 }
 
-                function performHtml2CanvasExport() {
-                    const mapElement = document.getElementById('map');
-                    
-                    html2canvas(mapElement, {
-                        useCORS: true,
-                        allowTaint: true,
-                        backgroundColor: '#1f2937',
-                        scale: 1,
-                        logging: false
-                    }).then(canvas => {
-                        try {
-                            const link = document.createElement('a');
-                            link.download = `fuel-stations-map-${new Date().getTime()}.png`;
-                            link.href = canvas.toDataURL('image/png');
-                            
-                            // Trigger download
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            
-                            // Reset button
-                            exportBtn.innerHTML = originalText;
-                            exportBtn.disabled = false;
-                            
-                            alert('Map exported successfully!');
-                            console.log('Html2canvas export completed successfully');
-                            
-                        } catch (downloadError) {
-                            console.error('Download error:', downloadError);
-                            alert('Export failed during download. Please try again.');
-                            exportBtn.innerHTML = originalText;
-                            exportBtn.disabled = false;
-                        }
-                    }).catch(error => {
-                        console.error('Html2canvas export error:', error);
-                        alert('Export failed. Please try again.');
-                        exportBtn.innerHTML = originalText;
-                        exportBtn.disabled = false;
-                    });
-                }
-
             } catch (error) {
-                console.error('Export error:', error);
-                alert('Export failed. Please try again.');
+                console.error('❌ Export error:', error);
+                showExportErrorPopup('Export failed. Please try again.');
                 const exportBtn = buttonElement || document.querySelector('[onclick*="exportMap"]');
                 if (exportBtn) {
                     exportBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Export Map';
@@ -2398,6 +2618,225 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 }
             }
         }
+
+        // Ultra-modern success popup for export completion
+        function showExportSuccessPopup(details) {
+            // Remove any existing popups
+            const existingPopup = document.querySelector('.export-success-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+
+            const popup = document.createElement('div');
+            popup.className = 'export-success-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                padding: 30px;
+                border-radius: 16px;
+                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+                z-index: 50000;
+                min-width: 400px;
+                text-align: center;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                animation: popupSlideIn 0.5s ease-out;
+            `;
+            
+            popup.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <i class="fas fa-check-circle" style="font-size: 48px; color: #ffffff; margin-bottom: 15px;"></i>
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Ultra-Clean Export Successful!</h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 16px;">Your crystal-clear map has been downloaded</p>
+                </div>
+                
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: left;">
+                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; font-size: 14px;">
+                        <span style="font-weight: 600; opacity: 0.9;">📐 Resolution:</span>
+                        <span style="font-family: monospace;">${details.resolution}</span>
+                        
+                        <span style="font-weight: 600; opacity: 0.9;">💾 File Size:</span>
+                        <span style="font-family: monospace;">${details.fileSize}</span>
+                        
+                        <span style="font-weight: 600; opacity: 0.9;">🎨 Style:</span>
+                        <span>${details.style}</span>
+                        
+                        <span style="font-weight: 600; opacity: 0.9;">✨ Quality:</span>
+                        <span>${details.quality}</span>
+                    </div>
+                </div>
+                
+                <button onclick="this.parentElement.remove()" 
+                        style="background: rgba(255, 255, 255, 0.2); 
+                               color: white; 
+                               border: none; 
+                               padding: 12px 24px; 
+                               border-radius: 8px; 
+                               cursor: pointer; 
+                               font-size: 16px; 
+                               font-weight: 500;
+                               transition: all 0.3s ease;
+                               backdrop-filter: blur(5px);"
+                        onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'"
+                        onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
+                    <i class="fas fa-times mr-2"></i>Close
+                </button>
+            `;
+
+            // Add animation keyframes if not already added
+            if (!document.querySelector('#popup-animations')) {
+                const style = document.createElement('style');
+                style.id = 'popup-animations';
+                style.textContent = `
+                    @keyframes popupSlideIn {
+                        from {
+                            opacity: 0;
+                            transform: translate(-50%, -60%);
+                            scale: 0.9;
+                        }
+                        to {
+                            opacity: 1;
+                            transform: translate(-50%, -50%);
+                            scale: 1;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(popup);
+
+            // Auto close after 8 seconds
+            setTimeout(() => {
+                if (popup.parentElement) {
+                    popup.style.animation = 'popupSlideIn 0.3s ease-in reverse';
+                    setTimeout(() => popup.remove(), 300);
+                }
+            }, 8000);
+        }
+
+        // Ultra-modern error popup for export failures
+        function showExportErrorPopup(message) {
+            // Remove any existing popups
+            const existingPopup = document.querySelector('.export-error-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+
+            const popup = document.createElement('div');
+            popup.className = 'export-error-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #ef4444, #dc2626);
+                color: white;
+                padding: 30px;
+                border-radius: 16px;
+                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+                z-index: 50000;
+                min-width: 400px;
+                max-width: 500px;
+                text-align: center;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                animation: popupSlideIn 0.5s ease-out;
+            `;
+            
+            popup.innerHTML = `
+                <div style="margin-bottom: 20px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #ffffff; margin-bottom: 15px;"></i>
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Export Failed</h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 16px; line-height: 1.5;">${message}</p>
+                </div>
+                
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button onclick="this.closest('.export-error-popup').remove()" 
+                            style="background: rgba(255, 255, 255, 0.2); 
+                                   color: white; 
+                                   border: none; 
+                                   padding: 12px 24px; 
+                                   border-radius: 8px; 
+                                   cursor: pointer; 
+                                   font-size: 16px; 
+                                   font-weight: 500;
+                                   transition: all 0.3s ease;
+                                   backdrop-filter: blur(5px);"
+                            onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'"
+                            onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
+                        <i class="fas fa-times mr-2"></i>Close
+                    </button>
+                    
+                    <button onclick="exportMap(); this.closest('.export-error-popup').remove();" 
+                            style="background: rgba(255, 255, 255, 0.9); 
+                                   color: #dc2626; 
+                                   border: none; 
+                                   padding: 12px 24px; 
+                                   border-radius: 8px; 
+                                   cursor: pointer; 
+                                   font-size: 16px; 
+                                   font-weight: 600;
+                                   transition: all 0.3s ease;"
+                            onmouseover="this.style.background='rgba(255, 255, 255, 1)'"
+                            onmouseout="this.style.background='rgba(255, 255, 255, 0.9)'">
+                        <i class="fas fa-redo mr-2"></i>Try Again
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(popup);
+
+            // Auto close after 10 seconds
+            setTimeout(() => {
+                if (popup.parentElement) {
+                    popup.style.animation = 'popupSlideIn 0.3s ease-in reverse';
+                    setTimeout(() => popup.remove(), 300);
+                }
+            }, 10000);
+        }
+
+        // Create high DPI canvas for crisp images
+        function createHighDPICanvas(width, height, scale) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set actual canvas size
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Scale the canvas for high DPI displays
+            canvas.style.width = (width / scale) + 'px';
+            canvas.style.height = (height / scale) + 'px';
+            
+            // Scale the drawing context for crisp rendering
+            ctx.scale(scale, scale);
+            
+            return canvas;
+        }
+
+        // Close export popup
+        function closeExportPopup() {
+            const popup = document.getElementById('export-popup');
+            if (popup) {
+                const popupContent = popup.querySelector('div > div');
+                popupContent.classList.add('scale-95', 'opacity-0');
+                popupContent.classList.remove('scale-100', 'opacity-100');
+                
+                setTimeout(() => {
+                    popup.remove();
+                }, 300);
+            }
+        }
+
+        // Make closeExportPopup globally accessible
+        window.closeExportPopup = closeExportPopup;
 
         // Export stations data as Excel
         function exportExcel() {

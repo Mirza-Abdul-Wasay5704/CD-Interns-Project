@@ -116,8 +116,8 @@
                             class="block py-3 px-4 text-yellow-400 bg-gray-700 rounded md:bg-transparent md:p-0 transition-all duration-300 hover:text-yellow-300">SSM</a>
                     </li>
                     <li>
-                        <a href="storage-manager.html"
-                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Storage</a>
+                        <a href="report.html"
+                            class="block py-3 px-4 text-white hover:text-yellow-400 md:p-0 transition-all duration-300">Report</a>
                     </li>
                 </ul>
             </div>
@@ -603,21 +603,21 @@
                 }
                 
                 // Show success toast if Toastify is available
-                setTimeout(() => {
-                    if (typeof Toastify !== 'undefined') {
-                        Toastify({
-                            text: "✅ Coordinates auto-loaded from cookies",
-                            duration: 3000,
-                            gravity: "top",
-                            position: "right",
-                            offset: {
-                                y: 80
-                            },
-                            className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
-                            stopOnFocus: true
-                        }).showToast();
-                    }
-                }, 100);
+                // setTimeout(() => {
+                //     if (typeof Toastify !== 'undefined') {
+                //         Toastify({
+                //             text: "✅ Coordinates auto-loaded from cookies",
+                //             duration: 3000,
+                //             gravity: "top",
+                //             position: "right",
+                //             offset: {
+                //                 y: 80
+                //             },
+                //             className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+                //             stopOnFocus: true
+                //         }).showToast();
+                //     }
+                // }, 100);
                 
             } else {
                 console.log('⚠️ No coordinates found in cookies in HTML');

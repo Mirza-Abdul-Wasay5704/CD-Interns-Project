@@ -1601,19 +1601,19 @@ function loadAnalysisDataFromStorage() {
                         console.log('📈 Summary:', analysisData.summary);
                         
                         // Show success notification with data summary
-                        const toast = Toastify({
-                            text: `Analysis data restored: ${analysisData.totalElements || 0} elements, ${Object.keys(analysisData.amenities?.details || {}).length} amenity types`,
-                            duration: 3000,
-                            gravity: "top",
-                            position: "right",
-                            offset: {
-                                x: 20,
-                                y: 80
-                            },
-                            className: "bg-gradient-to-r from-blue-800 to-blue-700 text-white rounded-lg shadow-lg border border-blue-600/20 font-medium text-sm",
-                            stopOnFocus: true
-                        });
-                        toast.showToast();
+                        // const toast = Toastify({
+                        //     text: `Analysis data restored: ${analysisData.totalElements || 0} elements, ${Object.keys(analysisData.amenities?.details || {}).length} amenity types`,
+                        //     duration: 3000,
+                        //     gravity: "top",
+                        //     position: "right",
+                        //     offset: {
+                        //         x: 20,
+                        //         y: 80
+                        //     },
+                        //     className: "bg-gradient-to-r from-blue-800 to-blue-700 text-white rounded-lg shadow-lg border border-blue-600/20 font-medium text-sm",
+                        //     stopOnFocus: true
+                        // });
+                        // toast.showToast();
                     }
                 }
                 
