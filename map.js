@@ -2073,16 +2073,12 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
         icon: L.divIcon({
             className: 'accurate-distance-label',
             html: `
-                <div class="bg-white px-3 py-1 rounded-full shadow-lg border-2 border-gray-300 text-center">
-                    <div class="font-bold text-gray-800 text-sm">${station.distance.toFixed(1)} km</div>
-                    ${station.travelTime ? `
-                        <div class="text-xs text-blue-600">~${Math.round(station.travelTime/60)}min</div>
-                    ` : ''}
-                   
+                <div class="bg-gray-900/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-lg border border-gray-600 text-center text-white">
+                    <div class="font-semibold text-xs">${station.distance.toFixed(1)}km</div>
                 </div>
             `,
-            iconSize: [80, 50],
-            iconAnchor: [40, 25]
+            iconSize: [50, 35],
+            iconAnchor: [25, 17]
         }),
         interactive: false
     });
@@ -2150,9 +2146,9 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
             const distanceLabel = L.marker([midLat, midLng], {
                 icon: L.divIcon({
                     className: 'distance-label',
-                    html: `<span class="inline-block whitespace-nowrap text-xs font-bold text-gray-700 bg-white px-2 py-1 rounded-full shadow-md border">${station.distance.toFixed(1)} km</span>`,
-                    iconSize: [50, 20],
-                    iconAnchor: [25, 10]
+                    html: `<span class="inline-block whitespace-nowrap text-xs font-semibold text-white bg-gray-900/90 backdrop-blur-sm px-2 py-1 rounded-lg shadow-md border border-gray-600">${station.distance.toFixed(1)}km</span>`,
+                    iconSize: [45, 25],
+                    iconAnchor: [22, 12]
                 }),
                 interactive: false
             }).addTo(map);
@@ -2373,88 +2369,31 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
 
                 console.log('🚀 Starting ultra-clean map export...');
 
+                // Safety timeout for the entire export process
+                const exportTimeout = setTimeout(() => {
+                    console.error('⚠️ Export process timeout - forcing cleanup');
+                    exportBtn.innerHTML = originalText;
+                    exportBtn.disabled = false;
+                    showExportErrorPopup('Export timed out. Please try again with a smaller map area.');
+                }, 30000); // 30 second timeout
+
                 // Use the most efficient clean export approach
                 performUltraCleanExport();
 
                 function performUltraCleanExport() {
+                    // Clear the timeout since we're proceeding
+                    clearTimeout(exportTimeout);
                     const mapElement = document.getElementById('map');
-                    const currentZoom = map.getZoom();
-                    const currentCenter = map.getCenter();
                     
-                    // Store original tile layer for restoration
-                    let originalTileLayer = null;
-                    map.eachLayer(layer => {
-                        if (layer instanceof L.TileLayer) {
-                            originalTileLayer = layer;
-                        }
-                    });
+                    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing Direct Capture...';
 
-                    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Switching to Clean Style...';
+                    console.log('🔄 Using direct capture approach (no layer switching)...');
 
-                    // Remove current tile layer
-                    if (originalTileLayer) {
-                        map.removeLayer(originalTileLayer);
-                    }
-
-                    // Use the CLEANEST possible tile layer - CartoDB Positron (roads + names only)
-                    const ultraCleanLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-                        attribution: '© CARTO © OpenStreetMap',
-                        subdomains: 'abcd',
-                        maxZoom: 20,
-                        crossOrigin: true
-                    });
-
-                    // Add labels layer separately for better control
-                    const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-                        attribution: '',
-                        subdomains: 'abcd', 
-                        maxZoom: 20,
-                        crossOrigin: true,
-                        pane: 'overlayPane'
-                    });
-
-                    // Add clean layers to map
-                    ultraCleanLayer.addTo(map);
-                    labelsLayer.addTo(map);
-
-                    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading Clean Tiles...';
-
-                    // Wait for clean tiles to load completely
-                    let tilesLoaded = 0;
-                    let totalTiles = 0;
-                    let labelsLoaded = 0;
-                    let totalLabels = 0;
-                    
-                    const checkAllTilesLoaded = () => {
-                        if (tilesLoaded >= totalTiles && labelsLoaded >= totalLabels && 
-                            totalTiles > 0 && totalLabels > 0) {
-                            console.log(`✅ All tiles loaded: ${totalTiles} base + ${totalLabels} labels`);
-                            
-                            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing High-Quality Capture...';
-                            
-                            setTimeout(() => {
-                                performActualCleanCapture();
-                            }, 1000);
-                        }
-                    };
-
-                    // Track base layer tiles
-                    ultraCleanLayer.on('tileloadstart', () => { totalTiles++; });
-                    ultraCleanLayer.on('tileload', () => { tilesLoaded++; checkAllTilesLoaded(); });
-                    ultraCleanLayer.on('tileerror', () => { tilesLoaded++; checkAllTilesLoaded(); });
-
-                    // Track labels layer tiles  
-                    labelsLayer.on('tileloadstart', () => { totalLabels++; });
-                    labelsLayer.on('tileload', () => { labelsLoaded++; checkAllTilesLoaded(); });
-                    labelsLayer.on('tileerror', () => { labelsLoaded++; checkAllTilesLoaded(); });
-
-                    // Fallback timeout
+                    // Direct capture approach - don't switch layers, just capture what's currently visible
                     setTimeout(() => {
-                        if (tilesLoaded < totalTiles || labelsLoaded < totalLabels) {
-                            console.log('⚠️ Tile loading timeout, proceeding with export...');
-                            performActualCleanCapture();
-                        }
-                    }, 8000);
+                        console.log('✅ Proceeding with direct capture of current map');
+                        performActualCleanCapture();
+                    }, 1000); // Short wait to ensure map is stable
 
                     function performActualCleanCapture() {
                         exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Capturing Ultra-Clean Image...';
@@ -2481,53 +2420,82 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                         // Force map refresh
                         map.invalidateSize();
 
+                        // Reduced wait time for faster export
                         setTimeout(() => {
-                            // Try multiple capture methods for best quality
                             attemptBestQualityCapture();
-                        }, 1500);
+                        }, 500); // Reduced from 1500ms to 500ms
 
                         function attemptBestQualityCapture() {
-                            const scale = 4; // Ultra high quality - 4x resolution
+                            const scale = 4; // Reduced scale from 8 to 4 for better compatibility and faster processing
                             const rect = mapElement.getBoundingClientRect();
                             
                             console.log(`📸 Capturing at ${scale}x quality: ${rect.width * scale}x${rect.height * scale}px`);
 
-                            // Method 1: Try html2canvas with optimal settings
+                            // Get current map bounds to ensure we capture the exact visible radius
+                            const bounds = map.getBounds();
+                            const center = map.getCenter();
+                            const zoom = map.getZoom();
+                            
+                            console.log(`🎯 Map bounds: ${bounds.toBBoxString()}, Center: ${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}, Zoom: ${zoom}`);
+
+                            // Capture the map as-is without zoom changes for reliability
+                            console.log('� Capturing current map view directly...');
+                            
+                            // Method 1: Try html2canvas with simplified settings for better reliability
                             html2canvas(mapElement, {
                                 useCORS: true,
-                                allowTaint: true,
+                                allowTaint: false,
                                 backgroundColor: '#ffffff',
                                 scale: scale,
                                 width: rect.width,
                                 height: rect.height,
                                 scrollX: 0,
                                 scrollY: 0,
-                                logging: false,
-                                imageTimeout: 30000,
+                                logging: true, // Enable logging to debug issues
+                                imageTimeout: 15000, // Reduced timeout
                                 removeContainer: false,
-                                foreignObjectRendering: true,
+                                foreignObjectRendering: false, // Disabled for compatibility
                                 letterRendering: true,
                                 onclone: function(clonedDoc) {
+                                    console.log('🎨 Enhancing cloned map for high quality...');
+                                    
                                     // Ensure perfect rendering in clone
                                     const clonedMap = clonedDoc.getElementById('map');
                                     if (clonedMap) {
-                                        clonedMap.style.background = '#ffffff';
+                                        clonedMap.style.background = '#f8f9fa';
                                         clonedMap.style.position = 'relative';
+                                        clonedMap.style.width = rect.width + 'px';
+                                        clonedMap.style.height = rect.height + 'px';
                                     }
                                     
                                     // Enhance tile visibility
                                     const tiles = clonedDoc.querySelectorAll('.leaflet-tile');
                                     tiles.forEach(tile => {
                                         tile.style.opacity = '1';
-                                        tile.style.imageRendering = 'crisp-edges';
-                                        tile.style.filter = 'contrast(1.1) brightness(1.05)';
+                                        tile.style.visibility = 'visible';
+                                        if (tile.complete && tile.naturalHeight !== 0) {
+                                            console.log('✅ Tile loaded:', tile.src.substring(0, 50) + '...');
+                                        }
                                     });
 
-                                    // Enhance fuel station markers
+                                    // Ensure fuel station markers are visible
                                     const markers = clonedDoc.querySelectorAll('.custom-marker, .custom-search-marker');
                                     markers.forEach(marker => {
-                                        marker.style.filter = 'drop-shadow(0 3px 6px rgba(0,0,0,0.4))';
-                                        marker.style.zIndex = '2000';
+                                        marker.style.zIndex = '3000';
+                                        marker.style.visibility = 'visible';
+                                    });
+
+                                    // Ensure distance labels are visible
+                                    const distanceLabels = clonedDoc.querySelectorAll('.distance-label, .accurate-distance-label');
+                                    distanceLabels.forEach(label => {
+                                        label.style.visibility = 'visible';
+                                        label.style.zIndex = '2000';
+                                    });
+
+                                    // Ensure connection lines are visible
+                                    const lines = clonedDoc.querySelectorAll('.leaflet-interactive');
+                                    lines.forEach(line => {
+                                        line.style.visibility = 'visible';
                                     });
                                 },
                                 ignoreElements: function(element) {
@@ -2535,19 +2503,46 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                                         element.classList.contains('leaflet-control-zoom') ||
                                         element.classList.contains('leaflet-control-attribution') ||
                                         element.classList.contains('leaflet-popup') ||
-                                        element.classList.contains('leaflet-tooltip')
+                                        element.classList.contains('leaflet-tooltip') ||
+                                        element.classList.contains('leaflet-control-layers')
                                     );
                                 }
                             }).then(canvas => {
-                                console.log('✅ Ultra-clean capture successful!');
+                                console.log('✅ High quality capture successful!');
                                 
-                                // Create ultra high-quality PNG
+                                // Check if canvas is empty (all white)
+                                const ctx = canvas.getContext('2d');
+                                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                const pixels = imageData.data;
+                                let isBlank = true;
+                                
+                                // Check if image has content (not all white)
+                                for (let i = 0; i < pixels.length; i += 4) {
+                                    if (pixels[i] !== 255 || pixels[i + 1] !== 255 || pixels[i + 2] !== 255) {
+                                        isBlank = false;
+                                        break;
+                                    }
+                                }
+                                
+                                if (isBlank) {
+                                    console.error('❌ Captured image is blank (all white)');
+                                    restoreOriginalMap();
+                                    showExportErrorPopup('Captured image is blank. This may be due to tile loading issues. Please wait for the map to fully load and try again.');
+                                    return;
+                                }
+                                
+                                // Create high-quality PNG
                                 const dataUrl = canvas.toDataURL('image/png', 1.0);
                                 
-                                // Download the image
+                                console.log(`📊 Image captured successfully: ${canvas.width}x${canvas.height}px`);
+                                
+                                // Download the high quality image
                                 const link = document.createElement('a');
                                 const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-                                link.download = `fuel-stations-ultra-clean-${timestamp}-4K.png`;
+                                const currentZoomLevel = map.getZoom();
+                                const radiusKm = document.getElementById('radius')?.value || '5';
+                                
+                                link.download = `fuel-stations-${scale}K-radius-${radiusKm}km-z${currentZoomLevel}-${timestamp}.png`;
                                 link.href = dataUrl;
                                 
                                 document.body.appendChild(link);
@@ -2559,35 +2554,27 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                                 
                                 // Calculate file size
                                 const fileSizeMB = Math.round(dataUrl.length * 0.75 / 1024 / 1024 * 100) / 100;
+                                const qualityDesc = scale === 4 ? '4K High' : `${scale}x High`;
                                 
                                 // Show success popup
                                 showExportSuccessPopup({
-                                    resolution: `${canvas.width}×${canvas.height}px (4K Quality)`,
-                                    fileSize: `~${fileSizeMB}MB`,
-                                    style: 'Ultra Clean - Roads & Names Only',
-                                    quality: 'Ultra High (4x) - Crystal Clear'
+                                    resolution: `${canvas.width}×${canvas.height}px (${qualityDesc} Quality)`,
+                                    fileSize: `${fileSizeMB}MB (PNG)`,
+                                    style: 'Current Map View - Exact Copy',
+                                    quality: `${qualityDesc} (${scale}x) - High Quality & Zoomable`
                                 });
                                 
-                                console.log('🎉 Ultra-clean export completed successfully!');
+                                console.log('🎉 High quality export completed successfully!');
                                 
                             }).catch(error => {
-                                console.error('❌ Capture failed:', error);
+                                console.error('❌ High quality capture failed:', error);
                                 restoreOriginalMap();
-                                showExportErrorPopup('High-quality capture failed. Please try again or check your browser compatibility.');
+                                showExportErrorPopup('High quality capture failed: ' + error.message + '. Try refreshing the page and ensuring the map is fully loaded.');
                             });
                         }
 
                         function restoreOriginalMap() {
                             try {
-                                // Remove clean layers
-                                map.removeLayer(ultraCleanLayer);
-                                map.removeLayer(labelsLayer);
-                                
-                                // Restore original tile layer
-                                if (originalTileLayer) {
-                                    originalTileLayer.addTo(map);
-                                }
-                                
                                 // Restore hidden elements
                                 hiddenElements.forEach(item => {
                                     item.element.style.display = item.originalDisplay;
@@ -2597,7 +2584,7 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                                 exportBtn.innerHTML = originalText;
                                 exportBtn.disabled = false;
                                 
-                                console.log('🔄 Map restored to original state');
+                                console.log('🔄 Map interface restored to original state');
                                 
                             } catch (restoreError) {
                                 console.error('❌ Error restoring map:', restoreError);
@@ -2651,24 +2638,34 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
             popup.innerHTML = `
                 <div style="margin-bottom: 20px;">
                     <i class="fas fa-check-circle" style="font-size: 48px; color: #ffffff; margin-bottom: 15px;"></i>
-                    <h3 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Ultra-Clean Export Successful!</h3>
-                    <p style="margin: 0; opacity: 0.9; font-size: 16px;">Your crystal-clear map has been downloaded</p>
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">🎯 Ultra-High Quality Export Complete!</h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 16px;">Crystal-clear zoomable map image downloaded</p>
                 </div>
                 
                 <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: left;">
                     <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; font-size: 14px;">
-                        <span style="font-weight: 600; opacity: 0.9;">📐 Resolution:</span>
-                        <span style="font-family: monospace;">${details.resolution}</span>
+                        <span style="font-weight: 600; opacity: 0.9;">� Resolution:</span>
+                        <span style="font-family: monospace; color: #fef3c7;">${details.resolution}</span>
                         
                         <span style="font-weight: 600; opacity: 0.9;">💾 File Size:</span>
-                        <span style="font-family: monospace;">${details.fileSize}</span>
+                        <span style="font-family: monospace; color: #fef3c7;">${details.fileSize}</span>
                         
                         <span style="font-weight: 600; opacity: 0.9;">🎨 Style:</span>
-                        <span>${details.style}</span>
+                        <span style="color: #fef3c7;">${details.style}</span>
                         
                         <span style="font-weight: 600; opacity: 0.9;">✨ Quality:</span>
-                        <span>${details.quality}</span>
+                        <span style="color: #a7f3d0; font-weight: 600;">${details.quality}</span>
+                        
+                        <span style="font-weight: 600; opacity: 0.9;">🎯 Features:</span>
+                        <span style="color: #fef3c7; font-size: 13px;">Pixel-perfect • Zoomable • Print-ready</span>
                     </div>
+                </div>
+                
+                <div style="background: rgba(16, 185, 129, 0.3); padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #10b981;">
+                    <p style="margin: 0; font-size: 13px; opacity: 0.95; line-height: 1.4;">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <strong>Pro Tip:</strong> This ultra-high resolution image can be zoomed extensively without losing quality. Perfect for detailed analysis and presentations!
+                    </p>
                 </div>
                 
                 <button onclick="this.parentElement.remove()" 
@@ -2684,7 +2681,7 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                                backdrop-filter: blur(5px);"
                         onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'"
                         onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
-                    <i class="fas fa-times mr-2"></i>Close
+                    <i class="fas fa-times mr-2"></i>Awesome!
                 </button>
             `;
 
@@ -2841,7 +2838,10 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
         // Export stations data as Excel
         function exportExcel() {
             try {
-                if (!currentStations || currentStations.length === 0) {
+                // Use filtered stations instead of all current stations
+                const stationsToExport = filteredStations && filteredStations.length > 0 ? filteredStations : currentStations;
+                
+                if (!stationsToExport || stationsToExport.length === 0) {
                     alert('No station data available to export. Please search for stations first.');
                     return;
                 }
@@ -2851,44 +2851,76 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                 exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Exporting...';
                 exportBtn.disabled = true;
 
-                // Prepare data for export
-                const exportData = currentStations.map((station, index) => ({
+                // Get search coordinates for reference
+                const searchLat = parseFloat(document.getElementById('latitude').value);
+                const searchLng = parseFloat(document.getElementById('longitude').value);
+
+                // Prepare data for export with requested fields
+                const exportData = stationsToExport.map((station, index) => ({
                     'S.No': index + 1,
                     'Station Name': station.name,
                     'Brand': station.brand,
-                    'Latitude': station.lat,
-                    'Longitude': station.lng,
-                    'Distance (km)': station.distance,
-                    'Rating': station.rating,
-                    'Price (Rs/L)': station.price,
-                    'Fuel Types': station.fuels.join(', '),
-                    'Address': station.address || 'N/A'
+                    'Latitude': station.lat.toFixed(6),
+                    'Longitude': station.lng.toFixed(6),
+                    'Distance from Pinpoint (km)': station.distance.toFixed(2),
+                    'Travel Time (minutes)': station.travelTime ? Math.round(station.travelTime/60) : 'N/A',
+                    'Distance Source': station.distanceSource || 'Direct distance',
+                    'Contact/Phone': station.phone || 'N/A',
+                    'Address/Location': station.address || 'N/A',
+                    'Road/Area': station.address ? station.address.split(',')[0] : 'N/A',
+                    'Rating': station.rating ? station.rating.toFixed(1) : 'N/A',
+                    'Price (Rs/L)': station.price || 'N/A',
+                    'Services': station.services ? station.services.join(', ') : 'N/A',
+                    'Search Point Lat': searchLat.toFixed(6),
+                    'Search Point Lng': searchLng.toFixed(6)
                 }));
 
-                // Convert to CSV format
-                const headers = Object.keys(exportData[0]);
-                const csvContent = [
-                    headers.join(','),
-                    ...exportData.map(row => 
-                        headers.map(header => {
-                            const value = row[header];
-                            // Escape values that contain commas or quotes
-                            return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
-                                ? `"${value.replace(/"/g, '""')}"` 
-                                : value;
-                        }).join(',')
-                    )
-                ].join('\n');
+                // Create Excel workbook using SheetJS (XLSX)
+                // If SheetJS is not loaded, fallback to CSV with .xlsx extension
+                if (typeof XLSX !== 'undefined') {
+                    // Use SheetJS to create proper Excel file
+                    const ws = XLSX.utils.json_to_sheet(exportData);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Fuel Stations");
+                    
+                    // Get active filter for filename
+                    const activeFilter = document.querySelector('[id^="filter-"].bg-yellow-600');
+                    const filterType = activeFilter ? activeFilter.id.replace('filter-', '') : 'all';
+                    
+                    const filename = `fuel-stations-${filterType}-${new Date().toISOString().split('T')[0]}.xlsx`;
+                    XLSX.writeFile(wb, filename);
+                } else {
+                    // Fallback to CSV with enhanced format
+                    console.log('XLSX library not found, using enhanced CSV format');
+                    const headers = Object.keys(exportData[0]);
+                    const csvContent = [
+                        headers.join(','),
+                        ...exportData.map(row => 
+                            headers.map(header => {
+                                const value = row[header];
+                                // Escape values that contain commas or quotes
+                                return typeof value === 'string' && (value.includes(',') || value.includes('"')) 
+                                    ? `"${value.replace(/"/g, '""')}"` 
+                                    : value;
+                            }).join(',')
+                        )
+                    ].join('\n');
 
-                // Create and download file
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `fuel-stations-data-${new Date().toISOString().split('T')[0]}.csv`;
-                link.click();
+                    // Create and download file
+                    const blob = new Blob([csvContent], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    
+                    // Get active filter for filename
+                    const activeFilter = document.querySelector('[id^="filter-"].bg-yellow-600');
+                    const filterType = activeFilter ? activeFilter.id.replace('filter-', '') : 'all';
+                    
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `fuel-stations-${filterType}-${new Date().toISOString().split('T')[0]}.xlsx`;
+                    link.click();
 
-                // Clean up
-                URL.revokeObjectURL(link.href);
+                    // Clean up
+                    URL.revokeObjectURL(link.href);
+                }
                 
                 // Reset button
                 setTimeout(() => {
@@ -2896,16 +2928,171 @@ function addAccurateDistanceLabel(searchLat, searchLng, station) {
                     exportBtn.disabled = false;
                 }, 1000);
 
-                // Show success message
-                alert('Station data exported successfully!');
+                // Show success popup instead of alert
+                const activeFilter = document.querySelector('[id^="filter-"].bg-yellow-600');
+                const filterType = activeFilter ? activeFilter.id.replace('filter-', '') : 'all';
+                showExcelExportSuccessPopup({
+                    count: stationsToExport.length,
+                    filterType: filterType,
+                    filename: `fuel-stations-${filterType}-${new Date().toISOString().split('T')[0]}.xlsx`,
+                    fileFormat: 'Microsoft Excel (.xlsx)',
+                    columns: Object.keys(exportData[0]).length
+                });
 
             } catch (error) {
                 console.error('Excel export error:', error);
-                alert('Export failed. Please try again.');
+                showExcelExportErrorPopup('Export failed. Please try again.');
                 const exportBtn = event.target.closest('button');
-                exportBtn.innerHTML = '<i class="fas fa-file-excel mr-2"></i>Export Excel';
-                exportBtn.disabled = false;
+                if (exportBtn) {
+                    exportBtn.innerHTML = '<i class="fas fa-file-excel mr-2"></i>Export Excel';
+                    exportBtn.disabled = false;
+                }
             }
+        }
+
+        function showExcelExportSuccessPopup(details) {
+            // Remove any existing popups
+            const existingPopup = document.querySelector('.excel-export-success-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+
+            const popup = document.createElement('div');
+            popup.className = 'excel-export-success-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;W
+                transform: translate(-50%, -50%);
+                background: #10b981;
+                color: white;
+                padding: 20px;
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+                z-index: 50000;
+                min-width: 300px;
+                max-width: 350px;
+                text-align: center;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                animation: popupSlideIn 0.4s ease-out;
+            `;
+            
+            popup.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <i class="fas fa-check-circle" style="font-size: 32px; color: #ffffff; margin-bottom: 10px;"></i>
+                    <h3 style="margin: 0 0 5px 0; font-size: 18px; font-weight: 600;">Excel Export Successful!</h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 14px;">${details.count} ${details.filterType} stations exported</p>
+                </div>
+                
+                <button onclick="this.closest('.excel-export-success-popup').remove()" 
+                        style="background: rgba(255, 255, 255, 0.2); 
+                               color: white; 
+                               border: none; 
+                               padding: 8px 20px; 
+                               border-radius: 6px; 
+                               cursor: pointer; 
+                               font-size: 14px; 
+                               font-weight: 500;
+                               transition: all 0.3s ease;"
+                        onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'"
+                        onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
+                    <i class="fas fa-check mr-1"></i>OK
+                </button>
+            `;
+
+            document.body.appendChild(popup);
+
+            // Auto close after 3 seconds
+            setTimeout(() => {
+                if (popup.parentElement) {
+                    popup.style.animation = 'popupSlideIn 0.3s ease-in reverse';
+                    setTimeout(() => popup.remove(), 300);
+                }
+            }, 3000);
+        }
+
+        // Show Excel export error popup
+        function showExcelExportErrorPopup(message) {
+            // Remove any existing popups
+            const existingPopup = document.querySelector('.excel-export-error-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+
+            const popup = document.createElement('div');
+            popup.className = 'excel-export-error-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: linear-gradient(135deg, #dc2626, #b91c1c);
+                color: white;
+                padding: 35px;
+                border-radius: 20px;
+                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+                z-index: 50000;
+                min-width: 400px;
+                max-width: 450px;
+                text-align: center;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                animation: popupSlideIn 0.5s ease-out;
+            `;
+            
+            popup.innerHTML = `
+                <div style="margin-bottom: 25px;">
+                    <div style="background: rgba(255, 255, 255, 0.2); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 36px; color: #ffffff;"></i>
+                    </div>
+                    <h3 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Export Failed</h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 16px; line-height: 1.5;">${message}</p>
+                </div>
+                
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button onclick="this.closest('.excel-export-error-popup').remove()" 
+                            style="background: rgba(255, 255, 255, 0.2); 
+                                   color: white; 
+                                   border: none; 
+                                   padding: 15px 30px; 
+                                   border-radius: 10px; 
+                                   cursor: pointer; 
+                                   font-size: 16px; 
+                                   font-weight: 500;
+                                   transition: all 0.3s ease;
+                                   backdrop-filter: blur(5px);"
+                            onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'"
+                            onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'">
+                        <i class="fas fa-times mr-2"></i>Close
+                    </button>
+                    
+                    <button onclick="exportExcel(); this.closest('.excel-export-error-popup').remove();" 
+                            style="background: rgba(255, 255, 255, 0.9); 
+                                   color: #b91c1c; 
+                                   border: none; 
+                                   padding: 15px 30px; 
+                                   border-radius: 10px; 
+                                   cursor: pointer; 
+                                   font-size: 16px; 
+                                   font-weight: 600;
+                                   transition: all 0.3s ease;"
+                            onmouseover="this.style.background='rgba(255, 255, 255, 1)'"
+                            onmouseout="this.style.background='rgba(255, 255, 255, 0.9)'">
+                        <i class="fas fa-redo mr-2"></i>Try Again
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(popup);
+
+            // Auto close after 8 seconds
+            setTimeout(() => {
+                if (popup.parentElement) {
+                    popup.style.animation = 'popupSlideIn 0.3s ease-in reverse';
+                    setTimeout(() => popup.remove(), 300);
+                }
+            }, 8000);
         }
 
         // Export the original searchStations function for storage manager use

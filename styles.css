@@ -82,6 +82,65 @@
 }
 
 /* =============================================================================
+   4. Ultra-High Quality Map Rendering for Export (Critical for sharp images)
+   ============================================================================= */
+
+/* Ensure tiles render at maximum sharpness */
+.leaflet-tile {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* Ultra-sharp marker rendering */
+.custom-marker,
+.custom-search-marker {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* Sharp line and polygon rendering */
+.leaflet-interactive {
+    shape-rendering: crispEdges;
+    image-rendering: crisp-edges;
+}
+
+/* Ultra-crisp distance labels */
+.distance-label {
+    font-smooth: never;
+    -webkit-font-smoothing: none;
+    text-rendering: geometricPrecision;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* Optimize map container for high-quality capture */
+#map {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* Ensure SVG elements render sharply */
+.leaflet-overlay-pane svg {
+    shape-rendering: crispEdges;
+    image-rendering: crisp-edges;
+}
+
+/* Optimize canvas elements for sharpness */
+.leaflet-zoom-animated {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* =============================================================================
    3. Focus Mode Pseudo-element Indicator (::before content not in Tailwind)
    ============================================================================= */
 

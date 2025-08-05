@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Trading Area</title>
-    <link rel="icon" type="image/png" href="/assets/logos/pso.png">
+    <link rel="icon" type="image/png" href="assets/logos/pso.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/flowbite@1.6.5/dist/flowbite.min.js"></script>
 
@@ -24,6 +24,9 @@
     
     <!-- HTML2Canvas for fallback export -->
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -66,6 +69,8 @@
             height: 500px;
             border-radius: 12px;
             border: 2px solid #374151;
+            position: relative;
+            z-index: 1;
         }
 
         .station-card {
@@ -87,6 +92,39 @@
 
         .fullscreen {
             border-radius: 0 !important;
+        }
+
+        /* Settings Dropdown */
+        .settings-dropdown {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 10000 !important;
+            position: absolute !important;
+            top: 100% !important;
+            right: 0 !important;
+            margin-top: 8px !important;
+        }
+
+        .settings-button:hover .settings-dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .settings-button {
+            z-index: 1001;
+            position: relative;
+        }
+
+        /* Override Leaflet's z-index */
+        .leaflet-container {
+            z-index: 1 !important;
+        }
+
+        .leaflet-control-container {
+            z-index: 999 !important;
         }
     </style>
 </head>
@@ -195,7 +233,7 @@
             <!-- Action Buttons -->
             <div class="flex flex-wrap gap-4">
                 <button id="searchBtn" onclick="searchStations()"
-                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center">
+                    class="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center border border-gray-600">
                     <i class="fas fa-search mr-2"></i>
                     Search Stations
                 </button>
@@ -224,27 +262,52 @@
                         <div class="flex gap-2">
                             
                             <button onclick="toggleFullscreen()"
-                                class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center">
+                                class="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center border border-gray-600">
                                 <i class="fas fa-expand mr-2"></i>
                                 Fullscreen
                             </button>
-                            <button id="distance-toggle-btn" onclick="toggleDistances()"
-                                class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center">
-                                <i class="fas fa-ruler mr-2"></i>
-                                Hide Distances
-                            </button>
+                            
+                            <!-- Settings Button with Dropdown -->
+                            <div class="relative settings-button z-50">
+                                <button id="settings-button" class="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center border border-gray-600">
+                                    <i class="fas fa-cog mr-2"></i>
+                                    Settings
+                                </button>
+                                
+                                <!-- Dropdown Menu -->
+                                <div id="settings-dropdown" class="settings-dropdown w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl">
+                                    <div class="p-2">
+                                        <!-- Hide Distances Toggle -->
+                                        <div class="flex items-center justify-between p-2 hover:bg-gray-700 rounded-md transition-colors">
+                                            <span class="text-sm text-gray-300">Hide Distances</span>
+                                            <button id="distance-toggle-btn" onclick="toggleDistances()" class="relative inline-flex items-center h-6 rounded-full w-11 bg-gray-600 transition-colors focus:outline-none">
+                                                <span id="distance-toggle-indicator" class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1"></span>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Hide Lines Toggle -->
+                                        <div class="flex items-center justify-between p-2 hover:bg-gray-700 rounded-md transition-colors">
+                                            <span class="text-sm text-gray-300">Hide Lines</span>
+                                            <button id="lines-toggle-btn" onclick="toggleLines()" class="relative inline-flex items-center h-6 rounded-full w-11 bg-gray-600 transition-colors focus:outline-none">
+                                                <span id="lines-toggle-indicator" class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform translate-x-1"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <button onclick="editMap()"
-                                class="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center">
+                                class="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center border border-gray-600">
                                 <i class="fas fa-edit mr-2"></i>
                                 Edit Map
                             </button>   
                             <button onclick="exportExcel()"
-                                class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center">
+                                class="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center border border-gray-600">
                                 <i class="fas fa-file-excel mr-2"></i>
                                 Export Excel
                             </button>
                             <button onclick="exportMap(this)"
-                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center">
+                                class="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm transition-all duration-300 flex items-center border border-gray-600">
                                 <i class="fas fa-download mr-2"></i>
                                 Export Map
                             </button>
@@ -409,6 +472,162 @@
 
     <!-- Map Functionality -->
     <script src="map.js"></script>
+    
+    <script>
+        // Settings Toggle Functions
+        let distancesHidden = false;
+        let linesHidden = false;
+
+        // Position dropdown correctly
+        function positionDropdown() {
+            // No longer needed with absolute positioning
+            return;
+        }
+
+        // Handle hover events
+        document.addEventListener('DOMContentLoaded', function() {
+            const settingsButton = document.getElementById('settings-button');
+            const dropdown = document.getElementById('settings-dropdown');
+            const container = settingsButton.parentElement;
+            
+            container.addEventListener('mouseenter', function() {
+                dropdown.style.opacity = '1';
+                dropdown.style.visibility = 'visible';
+                dropdown.style.transform = 'translateY(0)';
+            });
+            
+            container.addEventListener('mouseleave', function() {
+                dropdown.style.opacity = '0';
+                dropdown.style.visibility = 'hidden';
+                dropdown.style.transform = 'translateY(-10px)';
+            });
+        });
+
+        function toggleDistances() {
+            distancesHidden = !distancesHidden;
+            const indicator = document.getElementById('distance-toggle-indicator');
+            const toggleBtn = document.getElementById('distance-toggle-btn');
+            
+            if (distancesHidden) {
+                indicator.classList.add('translate-x-5');
+                indicator.classList.remove('translate-x-1');
+                toggleBtn.classList.add('bg-green-700');
+                toggleBtn.classList.remove('bg-gray-600');
+                
+                // Hide distance labels on map
+                if (typeof map !== 'undefined' && map.eachLayer) {
+                    map.eachLayer(function(layer) {
+                        if (layer.options && layer.options.className && layer.options.className.includes('distance-label')) {
+                            layer.setStyle({opacity: 0});
+                        }
+                        // Hide popups with distance info
+                        if (layer.getPopup && layer.getPopup()) {
+                            const popup = layer.getPopup();
+                            if (popup.getContent && popup.getContent().includes('km')) {
+                                layer.closePopup();
+                            }
+                        }
+                    });
+                }
+                
+                // Hide distance elements in DOM
+                const distanceElements = document.querySelectorAll('.distance-label, [class*="distance"]');
+                distanceElements.forEach(el => {
+                    if (el.textContent && el.textContent.includes('km')) {
+                        el.style.display = 'none';
+                    }
+                });
+                
+                console.log('Distances hidden');
+            } else {
+                indicator.classList.remove('translate-x-5');
+                indicator.classList.add('translate-x-1');
+                toggleBtn.classList.remove('bg-green-700');
+                toggleBtn.classList.add('bg-gray-600');
+                
+                // Show distance labels on map
+                if (typeof map !== 'undefined' && map.eachLayer) {
+                    map.eachLayer(function(layer) {
+                        if (layer.options && layer.options.className && layer.options.className.includes('distance-label')) {
+                            layer.setStyle({opacity: 1});
+                        }
+                    });
+                }
+                
+                // Show distance elements in DOM
+                const distanceElements = document.querySelectorAll('.distance-label, [class*="distance"]');
+                distanceElements.forEach(el => {
+                    if (el.textContent && el.textContent.includes('km')) {
+                        el.style.display = '';
+                    }
+                });
+                
+                console.log('Distances shown');
+            }
+        }
+
+        function toggleLines() {
+            linesHidden = !linesHidden;
+            const indicator = document.getElementById('lines-toggle-indicator');
+            const toggleBtn = document.getElementById('lines-toggle-btn');
+            
+            if (linesHidden) {
+                indicator.classList.add('translate-x-5');
+                indicator.classList.remove('translate-x-1');
+                toggleBtn.classList.add('bg-green-700');
+                toggleBtn.classList.remove('bg-gray-600');
+                
+                // Hide lines on map
+                if (typeof map !== 'undefined' && map.eachLayer) {
+                    map.eachLayer(function(layer) {
+                        // Hide polylines (lines between stations)
+                        if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                            layer.setStyle({opacity: 0, weight: 0});
+                        }
+                        // Hide any line elements
+                        if (layer.options && (layer.options.className === 'connection-line' || layer.options.color)) {
+                            layer.setStyle({opacity: 0});
+                        }
+                    });
+                }
+                
+                // Hide SVG lines in DOM
+                const lineElements = document.querySelectorAll('path[stroke], line, polyline, .connection-line');
+                lineElements.forEach(el => {
+                    el.style.display = 'none';
+                });
+                
+                console.log('Lines hidden');
+            } else {
+                indicator.classList.remove('translate-x-5');
+                indicator.classList.add('translate-x-1');
+                toggleBtn.classList.remove('bg-green-700');
+                toggleBtn.classList.add('bg-gray-600');
+                
+                // Show lines on map
+                if (typeof map !== 'undefined' && map.eachLayer) {
+                    map.eachLayer(function(layer) {
+                        // Show polylines (lines between stations)
+                        if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                            layer.setStyle({opacity: 1, weight: layer.options.originalWeight || 3});
+                        }
+                        // Show any line elements
+                        if (layer.options && (layer.options.className === 'connection-line' || layer.options.color)) {
+                            layer.setStyle({opacity: 1});
+                        }
+                    });
+                }
+                
+                // Show SVG lines in DOM
+                const lineElements = document.querySelectorAll('path[stroke], line, polyline, .connection-line');
+                lineElements.forEach(el => {
+                    el.style.display = '';
+                });
+                
+                console.log('Lines shown');
+            }
+        }
+    </script>
 </body>
 
 </html>

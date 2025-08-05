@@ -3,15 +3,15 @@ let map;
 let landUseChart;
 let currentAnalysisData = {};
 
-// Global variables to track map markers and circles
+
 let currentMarker = null;
 let currentCircle = null;
 
-// Global storage for polygon data
+
 window.currentPolygonData = {};
 
-// Toggle states for map elements
-let amenityMarkersVisible = true;
+
+let amenityMarkersVisible = false; // Changed to false - amenity markers hidden by default
 let centerMarkerVisible = true;
 let amenityMarkersGroup = null;
 
