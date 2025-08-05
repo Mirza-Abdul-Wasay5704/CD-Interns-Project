@@ -1812,7 +1812,7 @@ class StorageManager {
         // Report Classification
         doc.setFontSize(8);
         doc.setFont(undefined, 'bold');
-        doc.text('Internal Report', 210 - margin - 45, 10);
+        doc.text('CONFIDENTIAL - BOARD LEVEL REPORT', 210 - margin - 45, 10);
         
         // Report date and time
         doc.setFontSize(8);
@@ -2105,72 +2105,43 @@ class StorageManager {
         
         currentY += 8;
         
-        // Site Selection Matrix Scores Table
+        // Analysis Status Table
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(28, 102, 69);
-        doc.text('SITE SELECTION MATRIX SCORES', margin, currentY);
+        doc.text('ANALYSIS STATUS', margin, currentY);
         currentY += 6;
         
-        // Table header with light gray background (same as coordinates table)
+        // Status table header
         doc.setFillColor(248, 249, 250);
         doc.rect(margin, currentY, contentWidth, 6, 'F');
         doc.setFontSize(9);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text('Criteria', margin + 2, currentY + 4);
-        doc.text('Score', margin + 110, currentY + 4);
-        doc.text('Weight', margin + 140, currentY + 4);
+        doc.text('Module', margin + 2, currentY + 4);
+        doc.text('Status', margin + 70, currentY + 4);
+        doc.text('Data Points', margin + 130, currentY + 4);
         currentY += 8;
         
-        console.log('hello: ',allData.ssm.traffic.score);
-        
-        // Helper function to extract score and weight from string format "45/45" -> {score: 45, weight: 45}
-        const extractScoreAndWeight = (scoreString) => {
-            if (!scoreString) return { score: 0, weight: 0 };
-            if (typeof scoreString === 'number') return { score: scoreString, weight: 0 };
-            const scoreStr = String(scoreString);
-            const parts = scoreStr.split('/');
-            return {
-                score: parseInt(parts[0]) || 0,
-                weight: parseInt(parts[1]) || 0
-            };
-        };
-        
-        // SSM criteria data - arranged by weight (highest to lowest)
-        const trafficData = extractScoreAndWeight(allData.ssm?.traffic?.score || 0);
-        const competitionData = extractScoreAndWeight(allData.ssm?.competition?.score || 0);
-        const landData = extractScoreAndWeight(allData.ssm?.land?.score || 0);
-        const socioData = extractScoreAndWeight(allData.ssm?.socioEconomic?.score || 0);
-        
-        const ssmData = [
+        const analysisData = [
             { 
-                criteria: 'Traffic Analysis', 
-                score: trafficData.score,
-                weight: trafficData.weight
+                type: 'Fuel Stations', 
+                status: allData.map?.stations?.length > 0 ? 'COMPLETE' : 'PENDING',
+                points: allData.map?.stations?.length || 0
             },
             { 
-                criteria: 'Competition Analysis', 
-                score: competitionData.score,
-                weight: competitionData.weight
+                type: 'Land Use', 
+                status: allData.analysis?.landUse ? 'COMPLETE' : 'PENDING',
+                points: allData.analysis?.totalElements || 0
             },
             { 
-                criteria: 'Land Characteristics', 
-                score: landData.score,
-                weight: landData.weight
-            },
-            { 
-                criteria: 'Socio-Economic Factors', 
-                score: socioData.score,
-                weight: socioData.weight
+                type: 'Site Matrix', 
+                status: allData.ssm?.overallScore ? 'COMPLETE' : 'PENDING',
+                points: allData.ssm?.overallScore || 0
             }
         ];
         
-        // Calculate total weight
-        const totalWeight = ssmData.reduce((sum, item) => sum + item.weight, 0);
-        
-        // Main criteria rows
-        ssmData.forEach((item, index) => {
+        analysisData.forEach((item, index) => {
             if (index % 2 === 1) {
                 doc.setFillColor(252, 253, 254);
                 doc.rect(margin, currentY - 1, contentWidth, 6, 'F');
@@ -2179,39 +2150,23 @@ class StorageManager {
             doc.setFont(undefined, 'normal');
             doc.setFontSize(9);
             doc.setTextColor(0, 0, 0);
-            doc.text(item.criteria, margin + 2, currentY + 3);
+            doc.text(item.type, margin + 2, currentY + 3);
             
-            // Score color coding based on value
-            if (item.score >= 75) {
-                doc.setTextColor(28, 102, 69); // Green for high scores
-            } else if (item.score >= 50) {
-                doc.setTextColor(191, 144, 0); // Orange for medium scores
+            // Status color coding
+            if (item.status === 'COMPLETE') {
+                doc.setTextColor(28, 102, 69);
             } else {
-                doc.setTextColor(184, 49, 47); // Red for low scores
+                doc.setTextColor(184, 49, 47);
             }
             doc.setFont(undefined, 'bold');
-            doc.text(String(item.score), margin + 110, currentY + 3);
+            doc.text(item.status, margin + 70, currentY + 3);
             
             doc.setTextColor(0, 0, 0);
             doc.setFont(undefined, 'normal');
-            doc.text(String(item.weight), margin + 140, currentY + 3);
+            doc.text(String(item.points), margin + 130, currentY + 3);
             
             currentY += 6;
         });
-        
-        // Overall Score row with light gray background (same as other table rows)
-        doc.setFillColor(248, 249, 250);
-        doc.rect(margin, currentY, contentWidth, 6, 'F');
-        doc.setFontSize(9);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(0, 0, 0);
-        doc.text('Overall Score', margin + 2, currentY + 4);
-        doc.setTextColor(28, 102, 69); // Green color for the score value
-        doc.text(String(Math.round(allData.ssm.overallScore || 0)), margin + 110, currentY + 4);
-        doc.setTextColor(0, 0, 0);
-        doc.text(String(totalWeight), margin + 140, currentY + 4);
-        currentY += 8;
-        currentY += 10;
         
         return currentY + 10;
     }
@@ -3071,8 +3026,8 @@ class StorageManager {
             doc.setFont(undefined, 'bold');
             
             // Left side - Document classification
-            doc.text('PSO INTERNAL REPORT', 20, pageHeight - 8);
-
+            doc.text('PSO CONFIDENTIAL', 20, pageHeight - 8);
+            
             // Center - Company info
             doc.setFont(undefined, 'normal');
             doc.text('Pakistan State Oil Company Limited - Channel Development', pageWidth/2, pageHeight - 8, { align: 'center' });
