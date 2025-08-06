@@ -476,17 +476,30 @@
         </div>
 
         <!-- Loading Indicator -->
-        <div id="loadingIndicator" class="hidden bg-gray-800/70 backdrop-blur-sm rounded-xl border border-gray-700/50 p-12">
-            <div class="flex flex-col items-center justify-center space-y-6">
-                <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-yellow-400"></div>
-                <h3 class="text-xl font-bold text-white">Analyzing Site Parameters...</h3>
-                <p class="text-gray-400 text-center max-w-md">
-                    Evaluating traffic patterns, competition analysis, land classification, and socio-economic factors
-                </p>
-                <div class="flex space-x-2">
-                    <div class="w-3 h-3 bg-yellow-400 rounded-full animate-bounce"></div>
-                    <div class="w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+        <div id="loadingIndicator" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div class="bg-gray-800/95 backdrop-blur-lg rounded-2xl border border-gray-600/50 p-10 max-w-md mx-4 shadow-2xl">
+                <div class="flex flex-col items-center justify-center space-y-6">
+                    <!-- PSO Logo with Professional Animation -->
+                    <div class="relative">
+                        <div class="w-20 h-20 rounded-full bg-gray-700/50 flex items-center justify-center">
+                            <img src="assets/logos/pso.png" alt="PSO Logo" class="w-18 h-18 object-contain animate-pulse" />
+                        </div>
+                        <!-- Subtle rotating border -->
+                        <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-green-400 animate-spin"></div>
+                        <!-- Outer glow effect -->
+                        <div class="absolute inset-0 rounded-full bg-green-400/10 animate-pulse"></div>
+                    </div>
+                    <div class="text-center space-y-2">
+                    <p class="text-white font-semibold text-xl">Analyzing Site...</p>
+                    <!-- <p class="text-gray-300 text-sm">Finding fuel stations in your area</p> -->
+                </div>
+                    
+                    <!-- Professional Progress Dots -->
+                    <div class="flex space-x-3">
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                    </div>
                 </div>
             </div>
         </div>

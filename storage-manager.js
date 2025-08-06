@@ -2146,22 +2146,22 @@ class StorageManager {
         const ssmData = [
             { 
                 criteria: 'Traffic Analysis', 
-                score: trafficData.score,
+                score: trafficData.score < 10 ? '0' + trafficData.score : trafficData.score,
                 weight: trafficData.weight
             },
             { 
                 criteria: 'Competition Analysis', 
-                score: competitionData.score,
+                score: competitionData.score < 10 ? '0' + competitionData.score : competitionData.score,
                 weight: competitionData.weight
             },
             { 
                 criteria: 'Land Characteristics', 
-                score: landData.score,
+                score: landData.score < 10 ? '0' + landData.score : landData.score,
                 weight: landData.weight
             },
             { 
                 criteria: 'Socio-Economic Factors', 
-                score: socioData.score,
+                score: socioData.score < 10 ? '0' + socioData.score : socioData.score ,
                 weight: socioData.weight
             }
         ];

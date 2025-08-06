@@ -1795,8 +1795,8 @@ function loadCoordinatesFromCookies() {
             displayStationResults(stations);
             
             // Update loading text for distance calculation phase
-            document.getElementById('loadingIndicator').querySelector('.text-white.font-semibold').textContent = 'Calculating Distances...';
-            document.getElementById('loadingIndicator').querySelector('.text-gray-300.text-sm').textContent = 'Computing precise road distances using routing services';
+            // document.getElementById('loadingIndicator').querySelector('.text-white.font-semibold').textContent = 'Calculating Distances...';
+            // // document.getElementById('loadingIndicator').querySelector('.text-gray-300.text-sm').textContent = 'Computing precise road distances using routing services';
 
             // Calculate accurate distances with multiple routing services
             await fetchDistancesWithRouting(lat, lng, stations);
