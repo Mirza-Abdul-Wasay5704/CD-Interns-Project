@@ -237,13 +237,23 @@
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center">
                     <i class="fas fa-file-pdf text-green-400 text-xl mr-3"></i>
-                    <h2 class="text-2xl font-bold text-white">Professional Report Generation</h2>
+                    <h2 class="text-2xl font-bold text-white">Report Generation</h2>
                 </div>
                 <div class="flex items-center space-x-4">
                     <button 
+                        onclick="showAutoGenerateModal()" 
+                        id="autoGenerateBtn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center"
+                    >
+                        <i class="fas fa-magic mr-2"></i>
+                        <span>Auto Generate Data</span>
+                    </button>
+                    <button 
                         onclick="generateReport()" 
                         id="generateBtn"
-                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center"
+                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center disabled:bg-gray-600 disabled:cursor-not-allowed"
+                        disabled
+                        title="Complete all analyses first"
                     >
                         <i class="fas fa-file-pdf mr-2"></i>
                         <span>Generate Report</span>
@@ -251,7 +261,7 @@
                 </div>
             </div>
 
-            <p class="text-gray-300 text-sm mb-4">Generate comprehensive site analysis reports for board presentations</p>
+            <p class="text-gray-300 text-sm mb-4">Generate comprehensive site analysis reports for board presentations / CFT</p>
 
             <!-- Progress Bar (Hidden by default) -->
             <div id="progressContainer" class="hidden mb-4">
@@ -342,12 +352,159 @@
         </div>
     </footer>
 
+    <!-- Auto Generate Data Modal -->
+    <div id="autoGenerateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-map-marker-alt text-blue-400 text-xl mr-3"></i>
+                <h3 class="text-xl font-bold text-white">Site Coordinates</h3>
+                <button onclick="closeAutoGenerateModal()" class="ml-auto text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Latitude</label>
+                    <input 
+                        type="number" 
+                        id="autoGenLatitude" 
+                        step="any" 
+                        class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                        placeholder="24.8318068784576"
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Longitude</label>
+                    <input 
+                        type="number" 
+                        id="autoGenLongitude" 
+                        step="any" 
+                        class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                        placeholder="67.0765271168376"
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Analysis Radius (km)</label>
+                    <input 
+                        type="number" 
+                        id="autoGenRadius" 
+                        min="1" 
+                        max="10" 
+                        value="2"
+                        class="w-full bg-gray-700 text-white border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                    >
+                </div>
+
+                <p class="text-sm text-gray-400">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Your coordinates will be saved for future use. Leave fields as-is to use previously saved values.
+                </p>
+            </div>
+
+            <div class="flex justify-end space-x-4 mt-6">
+                <button 
+                    onclick="closeAutoGenerateModal()" 
+                    class="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                >
+                    Cancel
+                </button>
+                <button 
+                    onclick="startAutoGeneration()" 
+                    id="startAutoGenerationBtn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors flex items-center"
+                >
+                    <i class="fas fa-play mr-2"></i>
+                    Generate Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Generation Progress Modal -->
+    <div id="autoGenerationProgressModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+            <div class="text-center mb-6">
+                <div class="loading-spinner mx-auto mb-4"></div>
+                <h3 class="text-xl font-bold text-white mb-2">Generating Data...</h3>
+                <p class="text-gray-400" id="autoGenProgressText">Analyzing land use patterns...</p>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="space-y-3">
+                <div class="flex items-center text-sm" id="step-map">
+                    <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center mr-3 flex-shrink-0">
+                        <i class="fas fa-circle-notch fa-spin text-blue-400 hidden" id="step-map-loading"></i>
+                        <i class="fas fa-check text-green-400 hidden" id="step-map-complete"></i>
+                        <span class="text-gray-400" id="step-map-waiting">1</span>
+                    </div>
+                    <span class="text-gray-300">Fuel station data fetched</span>
+                </div>
+
+                <div class="flex items-center text-sm" id="step-analysis">
+                    <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center mr-3 flex-shrink-0">
+                        <i class="fas fa-circle-notch fa-spin text-blue-400 hidden" id="step-analysis-loading"></i>
+                        <i class="fas fa-check text-green-400 hidden" id="step-analysis-complete"></i>
+                        <span class="text-gray-400" id="step-analysis-waiting">2</span>
+                    </div>
+                    <span class="text-gray-300">Analyzing land use patterns...</span>
+                </div>
+
+                <div class="flex items-center text-sm" id="step-ssm">
+                    <div class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center mr-3 flex-shrink-0">
+                        <i class="fas fa-circle-notch fa-spin text-blue-400 hidden" id="step-ssm-loading"></i>
+                        <i class="fas fa-check text-green-400 hidden" id="step-ssm-complete"></i>
+                        <span class="text-gray-400" id="step-ssm-waiting">3</span>
+                    </div>
+                    <span class="text-gray-300">Calculating site metrics...</span>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <div class="w-full bg-gray-700 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" id="autoGenProgressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #374151;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
     <!-- Load Components -->
     <script src="components/header.js"></script>
     <script src="components/footer.js"></script>
     
     <!-- Storage Manager (Required for report generation) -->
     <script src="storage-manager.js"></script>
+    
+    <!-- Unified Data Generator (for consistent data) -->
+    <script src="unified-data-generator.js"></script>
+    
+    <!-- Original JS files (to use their functions) -->
+    <script src="map.js"></script>
+    <script src="analysis.js"></script>
+    <script src="ssm.js"></script>
+    
+    <!-- HTML Independent Analyzers V2 -->
+    <script src="map-analyzer-v2.js"></script>
+    <script src="analysis-v2.js"></script>
+    <script src="ssm-analyzer-v2.js"></script>
     
     <!-- Report-specific JavaScript -->
     <script src="report.js"></script>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Analyzer V2 Functions</title>
+</head>
+<body>
+    <h1>Testing Analyzer V2 Functions</h1>
+    <div id="testResults"></div>
+
+    <!-- Include required dependencies -->
+    <script src="storage-manager.js"></script>
+    <script src="unified-data-generator.js"></script>
+    <script src="map.js"></script>
+    <script src="analysis.js"></script>
+    <script src="ssm.js"></script>
+    
+    <!-- Include the V2 analyzers -->
+    <script src="map-analyzer-v2.js"></script>
+    <script src="analysis-v2.js"></script>
+    <script src="ssm-analyzer-v2.js"></script>
+
+    <script>
+        async function testAnalyzers() {
+            const testResults = document.getElementById('testResults');
+            const testCoords = { lat: 24.8607, lng: 67.0011, radius: 2 }; // Karachi coordinates
+            
+            try {
+                testResults.innerHTML += '<h2>Testing Analyzers...</h2>';
+                
+                // Test MapAnalyzerV2
+                testResults.innerHTML += '<h3>Testing MapAnalyzerV2...</h3>';
+                const mapAnalyzer = new MapAnalyzerV2();
+                const mapData = await mapAnalyzer.analyzeLocation(testCoords.lat, testCoords.lng, testCoords.radius);
+                testResults.innerHTML += `<p>✅ Map Analysis Complete - Found ${mapData.totalStations} stations</p>`;
+                testResults.innerHTML += `<p>📊 PSO Stations: ${mapData.statistics.psoStations}, Competitors: ${mapData.statistics.competitors}</p>`;
+                
+                // Test LandUseAnalyzerV2
+                testResults.innerHTML += '<h3>Testing LandUseAnalyzerV2...</h3>';
+                const landAnalyzer = new LandUseAnalyzerV2();
+                const landData = await landAnalyzer.analyzeLocation(testCoords.lat, testCoords.lng, testCoords.radius);
+                testResults.innerHTML += `<p>✅ Land Use Analysis Complete - Primary: ${landData.landUse?.primary || 'N/A'}</p>`;
+                testResults.innerHTML += `<p>🏗️ Viability Score: ${landData.viabilityScores?.overall || 'N/A'}</p>`;
+                
+                // Test SSMAnalyzerV2
+                testResults.innerHTML += '<h3>Testing SSMAnalyzerV2...</h3>';
+                const ssmAnalyzer = new SSMAnalyzerV2();
+                const ssmData = await ssmAnalyzer.analyzeLocation(testCoords.lat, testCoords.lng, testCoords.radius);
+                testResults.innerHTML += `<p>✅ SSM Analysis Complete - Category: ${ssmData.siteCategory || 'N/A'}</p>`;
+                testResults.innerHTML += `<p>📈 Overall Score: ${ssmData.overallScore || 'N/A'}</p>`;
+                
+                testResults.innerHTML += '<h2>🎉 All tests completed successfully!</h2>';
+                
+            } catch (error) {
+                testResults.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Run tests when page loads
+        window.addEventListener('load', testAnalyzers);
+    </script>
+</body>
+</html>

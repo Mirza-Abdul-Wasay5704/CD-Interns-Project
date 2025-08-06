@@ -5,6 +5,15 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeReportData();
     updateDataAvailability();
     setupStorageListeners();
+    loadSavedCoordinates();
+    checkDataAvailabilityForReportGeneration();
+    
+    // Debug: Check if analyzer modules are loaded
+    console.log('🔍 Checking analyzer modules:');
+    console.log('MapAnalyzerV2:', typeof window.MapAnalyzerV2);
+    console.log('LandUseAnalyzerV2:', typeof window.LandUseAnalyzerV2);
+    console.log('SSMAnalyzerV2:', typeof window.SSMAnalyzerV2);
+    console.log('StorageManager:', typeof StorageManager);
 });
 
 // Setup listeners for storage updates from other modules
@@ -39,6 +48,9 @@ function setupStorageListeners() {
                 }
                 break;
         }
+        
+        // Check data availability for report generation
+        checkDataAvailabilityForReportGeneration();
     });
 }
 
@@ -325,6 +337,12 @@ async function generateReport() {
         // Use StorageManager's professional PDF creation
         const pdfBlob = await storageManager.createProfessionalPDF(allData);
         
+        console.log('📄 PDF Generation Result:', {
+            blobExists: !!pdfBlob,
+            blobSize: pdfBlob ? pdfBlob.size : 0,
+            blobType: pdfBlob ? pdfBlob.type : 'N/A'
+        });
+        
         if (pdfBlob && pdfBlob.size > 0) {
             // Step 5: Complete
             progressBar.style.width = '100%';
@@ -333,6 +351,7 @@ async function generateReport() {
             
             // Create blob URL for viewing
             const pdfUrl = URL.createObjectURL(pdfBlob);
+            console.log('🔗 PDF URL created:', pdfUrl);
             
             // Store PDF for download
             window.generatedPDFBlob = pdfBlob;
@@ -354,7 +373,7 @@ async function generateReport() {
             }, 2000);
             
         } else {
-            throw new Error('Failed to generate PDF - empty or invalid result');
+            throw new Error(`Failed to generate PDF - ${pdfBlob ? 'empty blob (size: 0)' : 'no blob returned'}`);
         }
         
     } catch (error) {
@@ -381,54 +400,192 @@ function displayPDFInViewer(pdfUrl) {
     const reportViewer = document.getElementById('reportViewer');
     const pdfContainer = document.getElementById('pdfContainer');
     
-    // Try embedded PDF first, fallback to iframe
-    const isModernBrowser = 'PDFium' in window || navigator.pdfViewerEnabled !== false;
+    console.log('🔍 Attempting to display PDF:', pdfUrl);
     
-    if (isModernBrowser) {
-        // Use embed for modern browsers
-        pdfContainer.innerHTML = `
-            <embed 
-                src="${pdfUrl}" 
-                type="application/pdf" 
-                width="100%" 
-                height="600px"
-                class="rounded-lg border border-gray-600"
-            />
-        `;
-    } else {
-        // Fallback to iframe with PDF.js viewer or direct download
-        pdfContainer.innerHTML = `
-            <div class="bg-gray-700 rounded-lg p-8 text-center">
-                <div class="mb-6">
-                    <i class="fas fa-file-pdf text-6xl text-red-400 mb-4"></i>
-                    <h3 class="text-xl font-bold text-white mb-2">PDF Report Generated</h3>
-                    <p class="text-gray-300 mb-6">Your browser doesn't support embedded PDF viewing.</p>
-                </div>
-                <div class="space-y-4">
-                    <button 
-                        onclick="downloadReport()" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center mx-auto"
-                    >
-                        <i class="fas fa-download mr-2"></i>
-                        Download PDF Report
-                    </button>
-                    <button 
-                        onclick="openPDFInNewTab()" 
-                        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center mx-auto"
-                    >
-                        <i class="fas fa-external-link-alt mr-2"></i>
-                        Open in New Tab
-                    </button>
-                </div>
+    // Show loading message first
+    pdfContainer.innerHTML = `
+        <div class="flex items-center justify-center h-96 bg-gray-700/50 rounded-lg">
+            <div class="text-center text-gray-400">
+                <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                <p class="text-lg">Loading PDF...</p>
             </div>
-        `;
+        </div>
+    `;
+    
+    // Show the report viewer immediately
+    reportViewer.classList.remove('hidden');
+    reportViewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Try different display methods in order of preference
+    let displayMethod = 1;
+    
+    function tryDisplayMethod(method) {
+        console.log(`🔧 Trying PDF display method ${method}`);
+        
+        if (method === 1) {
+            // Method 1: Object tag (usually most reliable)
+            pdfContainer.innerHTML = `
+                <div class="relative w-full h-full">
+                    <object 
+                        data="${pdfUrl}#view=FitH&toolbar=1&navpanes=1&scrollbar=1" 
+                        type="application/pdf" 
+                        width="100%" 
+                        height="700px"
+                        class="rounded-lg border border-gray-600 bg-white"
+                        style="min-height: 700px;"
+                    >
+                        <p class="text-center text-gray-400 p-8">
+                            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i><br>
+                            Your browser does not support PDF display. Please use the download button below.
+                        </p>
+                    </object>
+                    <div class="absolute bottom-4 right-4 space-x-2">
+                        <button 
+                            onclick="downloadReport()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                            title="Download PDF"
+                        >
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button 
+                            onclick="openPDFInNewTab()" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                            title="Open in New Tab"
+                        >
+                            <i class="fas fa-external-link-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Check if object tag worked
+            setTimeout(() => {
+                const objectTag = pdfContainer.querySelector('object');
+                if (objectTag && objectTag.offsetHeight < 100) {
+                    console.log('❌ Object tag failed, trying method 2');
+                    tryDisplayMethod(2);
+                } else {
+                    console.log('✅ Object tag working');
+                }
+            }, 2000);
+            
+        } else if (method === 2) {
+            // Method 2: Embed tag
+            pdfContainer.innerHTML = `
+                <div class="relative w-full h-full">
+                    <embed 
+                        src="${pdfUrl}#view=FitH&toolbar=1&navpanes=1&scrollbar=1" 
+                        type="application/pdf" 
+                        width="100%" 
+                        height="700px"
+                        class="rounded-lg border border-gray-600 bg-white"
+                        style="min-height: 700px;"
+                    />
+                    <div class="absolute bottom-4 right-4 space-x-2">
+                        <button 
+                            onclick="downloadReport()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                            title="Download PDF"
+                        >
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button 
+                            onclick="openPDFInNewTab()" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                            title="Open in New Tab"
+                        >
+                            <i class="fas fa-external-link-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Check if embed tag worked
+            setTimeout(() => {
+                const embedTag = pdfContainer.querySelector('embed');
+                if (embedTag && embedTag.offsetHeight < 100) {
+                    console.log('❌ Embed tag failed, trying method 3');
+                    tryDisplayMethod(3);
+                } else {
+                    console.log('✅ Embed tag working');
+                }
+            }, 2000);
+            
+        } else if (method === 3) {
+            // Method 3: iframe
+            pdfContainer.innerHTML = `
+                <div class="relative w-full h-full">
+                    <iframe 
+                        src="${pdfUrl}" 
+                        width="100%" 
+                        height="700px"
+                        class="rounded-lg border border-gray-600 bg-white"
+                        style="min-height: 700px;"
+                        frameborder="0"
+                        onload="console.log('✅ Iframe loaded successfully')"
+                        onerror="console.log('❌ Iframe failed to load')"
+                    ></iframe>
+                    <div class="absolute bottom-4 right-4 space-x-2">
+                        <button 
+                            onclick="downloadReport()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                            title="Download PDF"
+                        >
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button 
+                            onclick="openPDFInNewTab()" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                            title="Open in New Tab"
+                        >
+                            <i class="fas fa-external-link-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Check if iframe worked
+            setTimeout(() => {
+                const iframeTag = pdfContainer.querySelector('iframe');
+                if (iframeTag && iframeTag.offsetHeight < 100) {
+                    console.log('❌ Iframe failed, showing fallback');
+                    tryDisplayMethod(4);
+                } else {
+                    console.log('✅ Iframe working');
+                }
+            }, 3000);
+            
+        } else {
+            // Method 4: Fallback - show download option only
+            console.log('💡 All display methods failed, showing fallback');
+            pdfContainer.innerHTML = `
+                <div class="text-center text-gray-400 p-8 bg-gray-700/50 rounded-lg">
+                    <i class="fas fa-file-pdf text-6xl mb-4"></i>
+                    <h3 class="text-xl font-semibold mb-2">PDF Generated Successfully</h3>
+                    <p class="text-gray-500 mb-6">Your browser doesn't support inline PDF viewing.<br>Please download the PDF or open it in a new tab.</p>
+                    <div class="space-x-4">
+                        <button 
+                            onclick="downloadReport()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                        >
+                            <i class="fas fa-download mr-2"></i>Download PDF
+                        </button>
+                        <button 
+                            onclick="openPDFInNewTab()" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-lg"
+                        >
+                            <i class="fas fa-external-link-alt mr-2"></i>Open in New Tab
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
     }
     
-    // Show the report viewer
-    reportViewer.classList.remove('hidden');
-    
-    // Scroll to viewer
-    reportViewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Start with method 1 after a short delay
+    setTimeout(() => {
+        tryDisplayMethod(1);
+    }, 500);
 }
 
 // Open PDF in new tab
@@ -509,5 +666,304 @@ function closeViewer() {
         URL.revokeObjectURL(window.generatedPDFUrl);
         window.generatedPDFUrl = null;
         window.generatedPDFBlob = null;
+    }
+}
+
+// ============================================================================
+// AUTO GENERATION FUNCTIONALITY
+// ============================================================================
+
+// Check data availability and enable/disable report generation
+function checkDataAvailabilityForReportGeneration() {
+    try {
+        const storageManager = new StorageManager();
+        const mapData = storageManager.getData('map');
+        const analysisData = storageManager.getData('analysis');
+        const ssmData = storageManager.getData('ssm');
+        
+        const hasMapData = mapData && Object.keys(mapData).length > 0;
+        const hasAnalysisData = analysisData && Object.keys(analysisData).length > 0;
+        const hasSSMData = ssmData && Object.keys(ssmData).length > 0;
+        
+        const generateBtn = document.getElementById('generateBtn');
+        const autoGenerateBtn = document.getElementById('autoGenerateBtn');
+        
+        if (hasMapData && hasAnalysisData && hasSSMData) {
+            generateBtn.disabled = false;
+            generateBtn.title = 'Generate comprehensive report';
+            generateBtn.classList.remove('disabled:bg-gray-600', 'disabled:cursor-not-allowed');
+        } else {
+            generateBtn.disabled = true;
+            const missingModules = [];
+            if (!hasMapData) missingModules.push('Map Analysis');
+            if (!hasAnalysisData) missingModules.push('Land Use Analysis');
+            if (!hasSSMData) missingModules.push('Site Selection Metrics');
+            
+            generateBtn.title = `Missing data: ${missingModules.join(', ')}. Use Auto Generate to create missing data.`;
+            generateBtn.classList.add('disabled:bg-gray-600', 'disabled:cursor-not-allowed');
+        }
+    } catch (error) {
+        console.log('Error checking data availability:', error);
+    }
+}
+
+// Load saved coordinates from cookies
+function loadSavedCoordinates() {
+    const latitude = getCookie('latitude') || '24.8318068784576';
+    const longitude = getCookie('longitude') || '67.0765271168376';
+    const radius = getCookie('radius') || '2';
+    
+    const latInput = document.getElementById('autoGenLatitude');
+    const lngInput = document.getElementById('autoGenLongitude');
+    const radiusInput = document.getElementById('autoGenRadius');
+    
+    if (latInput) latInput.value = latitude;
+    if (lngInput) lngInput.value = longitude;
+    if (radiusInput) radiusInput.value = radius;
+}
+
+// Show auto generate modal
+function showAutoGenerateModal() {
+    const modal = document.getElementById('autoGenerateModal');
+    modal.classList.remove('hidden');
+    loadSavedCoordinates();
+}
+
+// Close auto generate modal
+function closeAutoGenerateModal() {
+    const modal = document.getElementById('autoGenerateModal');
+    modal.classList.add('hidden');
+}
+
+// Save coordinates to cookies
+function saveCoordinates(lat, lng, radius) {
+    setCookie('latitude', lat, 30);
+    setCookie('longitude', lng, 30);
+    setCookie('radius', radius, 30);
+}
+
+// Cookie utility functions
+function setCookie(name, value, days) {
+    const expires = new Date();
+    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+}
+
+function getCookie(name) {
+    const nameEQ = name + "=";
+    const ca = document.cookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+    }
+    return null;
+}
+
+// Start auto generation process
+async function startAutoGeneration() {
+    const latInput = document.getElementById('autoGenLatitude');
+    const lngInput = document.getElementById('autoGenLongitude');
+    const radiusInput = document.getElementById('autoGenRadius');
+    
+    const lat = parseFloat(latInput.value);
+    const lng = parseFloat(lngInput.value);
+    const radius = parseFloat(radiusInput.value);
+    
+    // Validate inputs
+    if (isNaN(lat) || isNaN(lng) || isNaN(radius)) {
+        alert('Please enter valid coordinates and radius');
+        return;
+    }
+    
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        alert('Please enter valid latitude (-90 to 90) and longitude (-180 to 180)');
+        return;
+    }
+    
+    if (radius < 1 || radius > 10) {
+        alert('Please enter radius between 1 and 10 km');
+        return;
+    }
+    
+    // Save coordinates
+    saveCoordinates(lat, lng, radius);
+    
+    // Close input modal and show progress modal
+    closeAutoGenerateModal();
+    showAutoGenerationProgress();
+    
+    try {
+        // Load the HTML-independent analysis modules
+        await loadAnalysisModules();
+        
+        // Run analyses in sequence
+        await runAutoGeneration(lat, lng, radius);
+        
+        // Close progress modal and refresh data
+        hideAutoGenerationProgress();
+        checkDataAvailabilityForReportGeneration();
+        initializeReportData();
+        
+        showStatusMessage('All data generated successfully! You can now generate the report.', 'success');
+        
+    } catch (error) {
+        console.error('Error during auto generation:', error);
+        hideAutoGenerationProgress();
+        showStatusMessage('Error during data generation. Please try again.', 'error');
+    }
+}
+
+// Show auto generation progress modal
+function showAutoGenerationProgress() {
+    const modal = document.getElementById('autoGenerationProgressModal');
+    modal.classList.remove('hidden');
+    resetProgressSteps();
+}
+
+// Hide auto generation progress modal
+function hideAutoGenerationProgress() {
+    const modal = document.getElementById('autoGenerationProgressModal');
+    modal.classList.add('hidden');
+}
+
+// Reset progress steps
+function resetProgressSteps() {
+    const steps = ['map', 'analysis', 'ssm'];
+    steps.forEach(step => {
+        document.getElementById(`step-${step}-loading`).classList.add('hidden');
+        document.getElementById(`step-${step}-complete`).classList.add('hidden');
+        document.getElementById(`step-${step}-waiting`).classList.remove('hidden');
+    });
+    document.getElementById('autoGenProgressBar').style.width = '0%';
+}
+
+// Update progress step
+function updateProgressStep(step, status) {
+    const loadingEl = document.getElementById(`step-${step}-loading`);
+    const completeEl = document.getElementById(`step-${step}-complete`);
+    const waitingEl = document.getElementById(`step-${step}-waiting`);
+    
+    if (status === 'loading') {
+        waitingEl.classList.add('hidden');
+        loadingEl.classList.remove('hidden');
+        completeEl.classList.add('hidden');
+    } else if (status === 'complete') {
+        waitingEl.classList.add('hidden');
+        loadingEl.classList.add('hidden');
+        completeEl.classList.remove('hidden');
+    }
+}
+
+// Load HTML-independent analysis modules
+async function loadAnalysisModules() {
+    // Since modules are loaded directly in HTML, just verify they exist
+    return new Promise((resolve, reject) => {
+        // Check if all modules are loaded
+        if (typeof window.MapAnalyzerV2 !== 'undefined' && 
+            typeof window.LandUseAnalyzerV2 !== 'undefined' && 
+            typeof window.SSMAnalyzerV2 !== 'undefined') {
+            resolve();
+        } else {
+            // Wait a bit for modules to load
+            setTimeout(() => {
+                if (typeof window.MapAnalyzerV2 !== 'undefined' && 
+                    typeof window.LandUseAnalyzerV2 !== 'undefined' && 
+                    typeof window.SSMAnalyzerV2 !== 'undefined') {
+                    resolve();
+                } else {
+                    reject(new Error('Analysis modules not loaded'));
+                }
+            }, 1000);
+        }
+    });
+}
+
+// Run auto generation process
+async function runAutoGeneration(lat, lng, radius) {
+    const progressBar = document.getElementById('autoGenProgressBar');
+    const progressText = document.getElementById('autoGenProgressText');
+    
+    try {
+        // Ensure unified coordinates for all analyzers
+        const coordinates = {
+            lat: parseFloat(lat.toFixed(6)), // Ensure precision consistency
+            lng: parseFloat(lng.toFixed(6)),
+            radius: parseFloat(radius.toFixed(2))
+        };
+        
+        console.log('🎯 Starting unified analysis with coordinates:', coordinates);
+        
+        // Step 1: Map Analysis
+        updateProgressStep('map', 'loading');
+        progressText.textContent = 'Analyzing fuel stations...';
+        progressBar.style.width = '10%';
+        
+        if (typeof window.MapAnalyzerV2 !== 'undefined') {
+            const mapAnalyzer = new window.MapAnalyzerV2();
+            await mapAnalyzer.analyzeLocation(coordinates.lat, coordinates.lng, coordinates.radius);
+            updateProgressStep('map', 'complete');
+            progressBar.style.width = '33%';
+        } else {
+            throw new Error('Map analyzer not loaded');
+        }
+        
+        // Small delay to ensure data is stored
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Step 2: Land Use Analysis
+        updateProgressStep('analysis', 'loading');
+        progressText.textContent = 'Analyzing land use patterns...';
+        
+        if (typeof window.LandUseAnalyzerV2 !== 'undefined') {
+            const landUseAnalyzer = new window.LandUseAnalyzerV2();
+            await landUseAnalyzer.analyzeLocation(coordinates.lat, coordinates.lng, coordinates.radius);
+            updateProgressStep('analysis', 'complete');
+            progressBar.style.width = '66%';
+        } else {
+            throw new Error('Land use analyzer not loaded');
+        }
+        
+        // Small delay to ensure data is stored
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Step 3: SSM Analysis
+        updateProgressStep('ssm', 'loading');
+        progressText.textContent = 'Calculating site metrics...';
+        
+        if (typeof window.SSMAnalyzerV2 !== 'undefined') {
+            const ssmAnalyzer = new window.SSMAnalyzerV2();
+            await ssmAnalyzer.analyzeLocation(coordinates.lat, coordinates.lng, coordinates.radius);
+            updateProgressStep('ssm', 'complete');
+            progressBar.style.width = '100%';
+        } else {
+            throw new Error('SSM analyzer not loaded');
+        }
+        
+        progressText.textContent = 'All analyses completed successfully!';
+        console.log('✅ All unified analyses completed');
+        
+        // Final delay to ensure all data is stored
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Refresh the report data to show updated information
+        initializeReportData();
+        updateDataAvailability();
+        
+        // Hide progress modal after a short delay
+        setTimeout(() => {
+            hideAutoGenerationProgress();
+            showStatusMessage('✅ Auto-generation completed successfully!', 'success');
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Auto-generation failed:', error);
+        progressText.textContent = `Error: ${error.message}`;
+        
+        // Show error but don't hide modal immediately
+        setTimeout(() => {
+            hideAutoGenerationProgress();
+            showStatusMessage(`❌ Auto-generation failed: ${error.message}`, 'error');
+        }, 3000);
     }
 }

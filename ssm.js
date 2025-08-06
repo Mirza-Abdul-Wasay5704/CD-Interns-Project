@@ -677,7 +677,16 @@ async function performSSMAnalysis() {
     
     try {
         console.log(`🔍 Starting SSM Analysis for ${siteType} site at ${lat}, ${lng}`);
-        console.log('📡 Using OpenStreetMap (OSM) data for real geographic analysis');
+        
+        // Check if we have stored map data
+        const storedMapData = checkStoredMapData(lat, lng, radius);
+        if (storedMapData && storedMapData.stations && storedMapData.stations.length > 0) {
+            console.log('📡 Using stored map data for enhanced competition analysis');
+            showTemporaryMessage(`🔍 Auto-detected site type: ${siteType.toUpperCase()} | 🎯 Using stored map data (${storedMapData.stations.length} fuel stations)`, 'info');
+        } else {
+            console.log('📡 Using OpenStreetMap data for real geographic analysis');
+            showTemporaryMessage(`🔍 Auto-detected site type: ${siteType.toUpperCase()} | 📡 Using OpenStreetMap data`, 'info');
+        }
         
         // Store coordinates for other functions to use
         localStorage.setItem('currentSSMLat', lat);
@@ -1174,10 +1183,65 @@ async function analyzeTrafficNearLocationFallback(lat, lng, radius, siteType) {
     }
 }
 
-// 2. Competition Near Location Analysis using OSM data
+// Function to check if stored map data is available and relevant
+function checkStoredMapData(targetLat, targetLng, radius) {
+    try {
+        if (typeof getMapData === 'function') {
+            const mapData = getMapData();
+            if (mapData && mapData.stations && mapData.stations.length > 0) {
+                // Check if we have coordinates in map data to verify relevance
+                const mapCenter = mapData.coordinates || mapData.searchCoordinates;
+                if (mapCenter && mapCenter.latitude && mapCenter.longitude) {
+                    // Calculate distance to see if stored data is relevant
+                    const distance = calculateDistance(
+                        targetLat, targetLng,
+                        mapCenter.latitude, mapCenter.longitude
+                    );
+                    
+                    // If stored data is within reasonable range (e.g., 5km), use it
+                    if (distance <= 5) {
+                        console.log('✅ Using relevant stored map data for competition analysis');
+                        return mapData;
+                    }
+                }
+                
+                // Even if coordinates don't match, the data might still be useful
+                console.log('⚠️ Stored map data available but location may differ - using anyway');
+                return mapData;
+            }
+        }
+    } catch (error) {
+        console.warn('❌ Could not access stored map data:', error);
+    }
+    return null;
+}
+
+// Function to calculate distance between two coordinates
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// 2. Competition Near Location Analysis using stored map data + OSM fallback
 async function analyzeCompetitionNearLocation(lat, lng, radius) {
-    console.log('🏪 Analyzing competition near location using OSM data...');
+    console.log('🏪 Analyzing competition near location...');
     
+    // First try to use stored map data
+    const storedMapData = checkStoredMapData(lat, lng, radius);
+    
+    if (storedMapData && storedMapData.stations && storedMapData.stations.length > 0) {
+        console.log('🎯 Using stored map data for competition analysis');
+        return analyzeCompetitionFromStoredData(storedMapData, lat, lng, radius);
+    }
+    
+    // Fallback to OSM data if no stored data available
+    console.log('📡 No stored map data available, using OSM data...');
     try {
         // Fetch OSM data for competition analysis
         const osmCompetitionData = await fetchOSMCompetitionData(lat, lng, radius);
@@ -1248,6 +1312,79 @@ async function analyzeCompetitionNearLocation(lat, lng, radius) {
         // Fallback to existing logic
         return await analyzeCompetitionNearLocationFallback(lat, lng, radius);
     }
+}
+
+// New function to analyze competition from stored map data
+function analyzeCompetitionFromStoredData(mapData, targetLat, targetLng, radius) {
+    console.log('🎯 Analyzing competition using stored map data');
+    
+    const stations = mapData.stations || [];
+    const brandCounts = mapData.brandCounts || {};
+    
+    // Filter stations within the specified radius if coordinates are available
+    let relevantStations = stations;
+    
+    if (stations.length > 0 && stations[0].lat && stations[0].lng) {
+        relevantStations = stations.filter(station => {
+            if (station.lat && station.lng) {
+                const distance = calculateDistance(targetLat, targetLng, station.lat, station.lng);
+                return distance <= radius;
+            }
+            return true; // Include station if no coordinates available
+        });
+    }
+    
+    const totalStations = relevantStations.length;
+    
+    // Count PSO vs competitor stations
+    const psoStations = relevantStations.filter(station => 
+        station.brand && station.brand.toLowerCase().includes('pso')
+    ).length;
+    
+    const competitorStations = totalStations - psoStations;
+    const marketShare = totalStations > 0 ? Math.round((psoStations / totalStations) * 100) : 0;
+    
+    // Scoring logic: Less competition = higher score
+    let competitionScore = PSO_SCORING.CITY.COMPETITION;
+    
+    if (competitorStations === 0) {
+        competitionScore = PSO_SCORING.CITY.COMPETITION; // Full score
+    } else if (competitorStations <= 2) {
+        competitionScore = PSO_SCORING.CITY.COMPETITION * 0.8;
+    } else if (competitorStations <= 4) {
+        competitionScore = PSO_SCORING.CITY.COMPETITION * 0.6;
+    } else {
+        competitionScore = PSO_SCORING.CITY.COMPETITION * 0.3;
+    }
+    
+    // Get competitor brands from stored data
+    const competitorBrands = Object.keys(brandCounts)
+        .filter(brand => !brand.toLowerCase().includes('pso'))
+        .sort((a, b) => (brandCounts[b] || 0) - (brandCounts[a] || 0))
+        .slice(0, 3);
+    
+    console.log(`📊 Competition analysis results: ${totalStations} total, ${psoStations} PSO, ${competitorStations} competitors`);
+    
+    return {
+        score: Math.round(Math.min(competitionScore, PSO_SCORING.CITY.COMPETITION)),
+        maxScore: PSO_SCORING.CITY.COMPETITION,
+        totalStations,
+        psoStations,
+        competitorStations,
+        marketShare,
+        competitionIntensity: competitorStations,
+        details: {
+            competitionLevel: competitorStations <= 2 ? 'Low' : competitorStations <= 4 ? 'Medium' : 'High',
+            dominantCompetitors: competitorBrands.length > 0 ? competitorBrands : ['No Data Available'],
+            fuelStations: totalStations,
+            supportingBusinesses: {
+                fastFood: 0, // Not available in stored map data
+                convenience: 0,
+                restaurants: 0,
+                carServices: 0
+            }
+        }
+    };
 }
 
 // Fallback competition analysis (original method)

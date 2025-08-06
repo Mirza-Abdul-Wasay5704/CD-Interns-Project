@@ -590,6 +590,24 @@ function determineLandUseType(tags) {
     return 'Other';
 }
 
+// Helper function to calculate simple polygon area using shoelace formula
+function calculateSimplePolygonArea(geometry) {
+    if (!geometry || geometry.length < 3) return 0.001; // Default small area
+    
+    let area = 0;
+    for (let i = 0; i < geometry.length - 1; i++) {
+        area += (geometry[i].lon * geometry[i + 1].lat) - (geometry[i + 1].lon * geometry[i].lat);
+    }
+    // Close the polygon if not closed
+    const lastPoint = geometry[geometry.length - 1];
+    const firstPoint = geometry[0];
+    if (lastPoint.lat !== firstPoint.lat || lastPoint.lon !== firstPoint.lon) {
+        area += (lastPoint.lon * firstPoint.lat) - (firstPoint.lon * lastPoint.lat);
+    }
+    
+    return Math.abs(area) / 2; // Return area in square degrees (will be converted to square meters)
+}
+
 // Add land use polygons to map with area calculation
 function addLandUseToMap(data) {
     // Clear existing layers (polygons, polylines, but preserve amenity markers)
@@ -642,9 +660,24 @@ function addLandUseToMap(data) {
         centerToggleBtn.title = 'Hide Center Marker & Radius';
     }
     
-    // Create analysis circle as turf polygon for clipping
-    const center = turf.point([lng, lat]);
-    const circlePolygon = turf.buffer(center, radius / 1000, { units: 'kilometers' });
+    // Create analysis circle as turf polygon for clipping (with fallback)
+    let circlePolygon = null;
+    let useTurfClipping = false;
+    
+    if (typeof turf !== 'undefined') {
+        try {
+            const center = turf.point([lng, lat]);
+            circlePolygon = turf.buffer(center, radius / 1000, { units: 'kilometers' });
+            useTurfClipping = true;
+            console.log('Using Turf.js for polygon clipping');
+        } catch (error) {
+            console.warn('Turf.js failed, using simple polygon processing:', error);
+            useTurfClipping = false;
+        }
+    } else {
+        console.warn('Turf.js not available, using simple polygon processing');
+        useTurfClipping = false;
+    }
     
     const areaAnalysis = {
         residential: 0,
@@ -710,75 +743,112 @@ function addLandUseToMap(data) {
             }
             
             try {
-                // Convert coordinates to turf polygon
-                const coordinates = element.geometry.map(coord => [coord.lon, coord.lat]);
-                coordinates.push(coordinates[0]); // Close the polygon
-                
-                const polygon = turf.polygon([coordinates]);
-                
-                // Clip polygon to analysis circle
-                const clipped = turf.intersect(polygon, circlePolygon);
-                
-                if (clipped && clipped.geometry) {
-                    // Calculate area in square meters
-                    const area = turf.area(clipped);
-                    areaAnalysis[landUseType] += area;
+                if (useTurfClipping && circlePolygon) {
+                    // Use Turf.js for precise clipping
+                    const coordinates = element.geometry.map(coord => [coord.lon, coord.lat]);
+                    coordinates.push(coordinates[0]); // Close the polygon
                     
-                    // Convert back to Leaflet coordinates
-                    let leafletCoords;
-                    if (clipped.geometry.type === 'Polygon') {
-                        leafletCoords = clipped.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
-                    } else if (clipped.geometry.type === 'MultiPolygon') {
-                        // Handle multipolygons
-                        clipped.geometry.coordinates.forEach(polyCoords => {
-                            leafletCoords = polyCoords[0].map(coord => [coord[1], coord[0]]);
-                            
-                            if (leafletCoords.length > 2) {
-                                // Store polygon data for recreation
-                                const landUseType = determineLandUseType(tags);
-                                if (!window.currentPolygonData[landUseType]) {
-                                    window.currentPolygonData[landUseType] = [];
-                                }
-                                window.currentPolygonData[landUseType].push({
-                                    coordinates: polyCoords[0],
-                                    area: area,
-                                    percentage: (area / (Math.PI * Math.pow(radius, 2))) * 100,
-                                    tags: tags
-                                });
+                    const polygon = turf.polygon([coordinates]);
+                    
+                    // Clip polygon to analysis circle
+                    const clipped = turf.intersect(polygon, circlePolygon);
+                    
+                    if (clipped && clipped.geometry) {
+                        // Calculate area in square meters
+                        const area = turf.area(clipped);
+                        areaAnalysis[landUseType] += area;
+                        
+                        // Convert back to Leaflet coordinates
+                        let leafletCoords;
+                        if (clipped.geometry.type === 'Polygon') {
+                            leafletCoords = clipped.geometry.coordinates[0].map(coord => [coord[1], coord[0]]);
+                        } else if (clipped.geometry.type === 'MultiPolygon') {
+                            // Handle multipolygons
+                            clipped.geometry.coordinates.forEach(polyCoords => {
+                                leafletCoords = polyCoords[0].map(coord => [coord[1], coord[0]]);
                                 
-                                L.polygon(leafletCoords, {
-                                    color: color,
-                                    fillColor: fillColor,
-                                    weight: 2,
-                                    fillOpacity: 0.6,
-                                    opacity: 0.8
-                                }).addTo(map)
-                                .bindPopup(`
-                                    <div class="bg-gray-800 text-white p-2 rounded">
-                                        <strong>${tags.landuse || tags.building || 'Unknown'}</strong><br>
-                                        <span class="text-sm">${tags.name || 'Unnamed area'}</span><br>
-                                        <span class="text-xs text-gray-300">Area: ${(area/1000).toFixed(1)} km²</span>
-                                    </div>
-                                `);
+                                if (leafletCoords.length > 2) {
+                                    // Store polygon data for recreation
+                                    const landUseType = determineLandUseType(tags);
+                                    if (!window.currentPolygonData[landUseType]) {
+                                        window.currentPolygonData[landUseType] = [];
+                                    }
+                                    window.currentPolygonData[landUseType].push({
+                                        coordinates: polyCoords[0],
+                                        area: area,
+                                        percentage: (area / (Math.PI * Math.pow(radius, 2))) * 100,
+                                        tags: tags
+                                    });
+                                    
+                                    L.polygon(leafletCoords, {
+                                        color: color,
+                                        fillColor: fillColor,
+                                        weight: 2,
+                                        fillOpacity: 0.6,
+                                        opacity: 0.8
+                                    }).addTo(map)
+                                    .bindPopup(`
+                                        <div class="bg-gray-800 text-white p-2 rounded">
+                                            <strong>${tags.landuse || tags.building || 'Unknown'}</strong><br>
+                                            <span class="text-sm">${tags.name || 'Unnamed area'}</span><br>
+                                            <span class="text-xs text-gray-300">Area: ${(area/1000).toFixed(1)} km²</span>
+                                        </div>
+                                    `);
+                                }
+                            });
+                            return;
+                        }
+                        
+                        if (leafletCoords && leafletCoords.length > 2) {
+                            // Store polygon data for recreation
+                            const landUseType = determineLandUseType(tags);
+                            if (!window.currentPolygonData[landUseType]) {
+                                window.currentPolygonData[landUseType] = [];
                             }
-                        });
-                        return;
+                            window.currentPolygonData[landUseType].push({
+                                coordinates: coordinates.map(coord => [coord[1], coord[0]]), // Note: swap lat/lng for storage
+                                area: area,
+                                percentage: (area / (Math.PI * Math.pow(radius * 1000, 2))) * 100,
+                                tags: tags
+                            });
+                            
+                            L.polygon(leafletCoords, {
+                                color: color,
+                                fillColor: fillColor,
+                                weight: 2,
+                                fillOpacity: 0.6,
+                                opacity: 0.8
+                            }).addTo(map)
+                            .bindPopup(`
+                                <div class="bg-gray-800 text-white p-2 rounded">
+                                    <strong>${tags.landuse || tags.building || 'Unknown'}</strong><br>
+                                    <span class="text-sm">${tags.name || 'Unnamed area'}</span><br>
+                                    <span class="text-xs text-gray-300">Area: ${(area/1000).toFixed(1)} km²</span>
+                                </div>
+                            `);
+                        }
                     }
-                    
-                    if (leafletCoords && leafletCoords.length > 2) {
+                } else {
+                    // Fallback: Simple polygon processing without clipping
+                    const coordinates = element.geometry.map(coord => [coord.lat, coord.lon]);
+                    if (coordinates.length > 2) {
+                        // Estimate area using simple polygon area calculation
+                        const area = calculateSimplePolygonArea(element.geometry) * 1000000; // Convert to square meters
+                        areaAnalysis[landUseType] += area;
+                        
                         // Store polygon data for recreation
                         const landUseType = determineLandUseType(tags);
                         if (!window.currentPolygonData[landUseType]) {
                             window.currentPolygonData[landUseType] = [];
                         }
                         window.currentPolygonData[landUseType].push({
-                            coordinates: coordinates.map(coord => [coord.lng, coord.lat]),
+                            coordinates: coordinates,
                             area: area,
-                            percentage: (area / (Math.PI * Math.pow(radius, 2))) * 100,
+                            percentage: (area / (Math.PI * Math.pow(radius * 1000, 2))) * 100,
                             tags: tags
                         });
                         
-                        L.polygon(leafletCoords, {
+                        L.polygon(coordinates, {
                             color: color,
                             fillColor: fillColor,
                             weight: 2,
@@ -789,7 +859,7 @@ function addLandUseToMap(data) {
                             <div class="bg-gray-800 text-white p-2 rounded">
                                 <strong>${tags.landuse || tags.building || 'Unknown'}</strong><br>
                                 <span class="text-sm">${tags.name || 'Unnamed area'}</span><br>
-                                <span class="text-xs text-gray-300">Area: ${(area/1000).toFixed(1)} km²</span>
+                                <span class="text-xs text-gray-300">Area: ${(area/1000000).toFixed(3)} km²</span>
                             </div>
                         `);
                     }
@@ -1283,6 +1353,9 @@ async function startAnalysis() {
     showLoading();
     
     try {
+        // Small delay to ensure all libraries are loaded
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Update map view to new coordinates
         map.setView([lat, lng], 13);
         
@@ -1310,14 +1383,31 @@ async function startAnalysis() {
         // Update UI with land use data only (amenities handled by HTML)
         updateUI(analysis, areaAnalysis);
         
-        // Now update unified amenity data via the HTML system
-        if (window.updateAmenityDataForAnalysis) {
-            console.log('Updating unified amenity data...');
-            await window.updateAmenityDataForAnalysis();
-        }
+        // Success message
+        Toastify({
+            text: "Land use analysis completed successfully!",
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            offset: { x: 20, y: 80 },
+            className: "bg-gradient-to-r from-green-800 to-green-700 text-white rounded-lg shadow-lg border border-green-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+            stopOnFocus: true
+        }).showToast();
         
     } catch (error) {
         console.error('Analysis failed:', error);
+        
+        // Show error toast
+        Toastify({
+            text: `Analysis failed: ${error.message}`,
+            duration: 5000,
+            gravity: "top",
+            position: "right",
+            offset: { x: 20, y: 80 },
+            className: "bg-gradient-to-r from-red-800 to-red-700 text-white rounded-lg shadow-lg border border-red-600/20 font-medium text-sm transition-all duration-300 ease-out transform",
+            stopOnFocus: true
+        }).showToast();
+        
         alert('Analysis failed. Please check your internet connection and try again.');
     } finally {
         hideLoading();
